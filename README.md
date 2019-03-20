@@ -1,3 +1,3 @@
 # BattleCodeGroup4
-Ali Khan,Zoe Lambert,Jonathan Gorel
+Ali Khan,Zoe Lambert,Jonathan Gorel, Whitney Trovinger
 
