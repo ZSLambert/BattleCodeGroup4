@@ -217,6 +217,7 @@ def BFS_firstStep(unit, destination):
                 #print(str(adjLoc) + " is not in visited!")
                 parent[adjLoc] = node # <<<<< record its parent 
                 queue.append(adjLoc)
+        return bc.Direction.Center
 
 def getNeighbors(location):
     
@@ -327,7 +328,7 @@ def WorkerLogic(unit):
             destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
             Memory.destinations[unit.id] = destination
             
-        myDirection = BFS_firstStep(unit, destination)
+        myDirection = BFS_firstStep(unit, destination) 
         if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
             gc.move_robot(unit.id, myDirection)
             return
