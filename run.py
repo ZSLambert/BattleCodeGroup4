@@ -99,6 +99,7 @@ karboniteMapMars = []
 passableMapEarth = []
 passableMapMars = []
 
+#create the shells of the maps
 for i in range(earthWidth):
     karboniteMapEarth.append([0] * earthHeight)
     passableMapEarth.append([False] * earthHeight)
@@ -110,6 +111,7 @@ for i in range(marsWidth):
     
 totalCount = 0
 
+#add in numbers/booleans for where karbonite/passable terrain is.
 for i in range(earthWidth):
     for j in range(earthHeight):
         print("Working with point " + str(i) + "," + str(j))
@@ -139,14 +141,12 @@ for unit in gc.my_units():
 for point in startPoints:
     enemyStartPoints.append(invertPoint(point, bc.Planet.Earth))
     
-        
+#determines whether a map location is on the map based on its x and y coordinates  
 def onMap(loc):
     x = loc.x
     y = loc.y
     if loc.planet == bc.Planet.Earth:
-        #print("Planet is Earth. Checking " + str(x) + "," + str(y))
         if x < 0 or x >= earthWidth or y < 0 or y >= earthHeight:
-            #print("This is not on the map!")
             return False
     elif loc.planet == bc.Planet.Mars:
         if x < 0 or x >= marsWidth or y < 0 or y >= marsHeight:
@@ -190,23 +190,19 @@ def BFS_firstStep(unit, destination):
     visited = []
     queue.append(startLoc)
     while queue:
+        #to intelligently choose nodes, get the one with the lowest straight line distance to destination, then remove that node from the queue.
         node, index = lowestDist(queue, destination)
         queue.pop(index)
         visited.append(node)
-        #print(node)
-        #print("We've visited: ")
-        #print(visited)
         if node == destLoc:
-            #print("Reached end, reversing!")
             #starts a list which will track the entire path from the end to the exit
             #ends up reversing it and returning the location of the first step
             path = [destLoc]
             while path[-1] != startLoc:
                 path.append(parent[path[-1]])
             path.reverse()
-            #print("Path is ")
-            #print(path)
             print("BFS took " + str(int(round(time.time() * 1000)) - startT) + " time.")
+            #debugging in case we ever have the same destination as start point
             if len(path) == 1:
                 return bc.Direction.Center
             return start.direction_to(bc.MapLocation(planet, path[1][0], path[1][1]))
@@ -214,20 +210,18 @@ def BFS_firstStep(unit, destination):
         for adjacent in getNeighbors(bc.MapLocation(planet, node[0], node[1])):
             adjLoc = (adjacent.x, adjacent.y)
             if adjLoc not in visited and adjLoc not in queue:
-                #print(str(adjLoc) + " is not in visited!")
-                parent[adjLoc] = node # <<<<< record its parent 
+                parent[adjLoc] = node # <<<<< record the parent of the node - used to get the path
                 queue.append(adjLoc)
+        #current bugFix - hoping to remove in the future - handles cases where we are trying to reach an unreachable destination.
         return bc.Direction.Center
 
 def getNeighbors(location):
     
     neighbors = []
-    
+    #goes through all the different changes that could be applied to a position, and adds them to our list if they have passable terrain
     for change in Constants.DIRECTION_CHANGES:
         tempLoc = bc.MapLocation(location.planet, location.x + change[0], location.y + change[1])
-        #print("this neighbor is " + str(tempLoc.x) + "," + str(tempLoc.y))
         if onMap(tempLoc):
-            #print("This is on the map!")
             if location.planet == bc.Planet.Earth:
                 if earthMap.is_passable_terrain_at(tempLoc):
                     neighbors.append(tempLoc)
@@ -237,13 +231,13 @@ def getNeighbors(location):
     
     return neighbors
 
+#greedy BFS to find the closest location with karbonite to our initial location.
 def nearbyKarb(location, planet):
     startT = int(round(time.time() * 1000))
     queue = [location]
     visited = []
     while queue:
         node = queue.pop(0)
-        #print("Checking " + str(node.x) + "," + str(node.y) + " for karbonite")
         visited.append(node)
         if planet == bc.Planet.Earth and karboniteMapEarth[node.x][node.y] > 0:
             print("nearbyKarb took " + str(int(round(time.time() * 1000)) - startT) + " time.")
@@ -257,6 +251,7 @@ def nearbyKarb(location, planet):
                     #print(str(adjLoc) + " is not in visited!")
                     queue.append(adjacent)
 
+#given a unit and a direction, returns the location of the unit moved in that direction.
 def locFromDirect(unit, direction):
     location = unit.location.map_location()
     change = Constants.CHANGE_FROM_DIRECT[direction]
@@ -271,13 +266,16 @@ def WorkerLogic(unit):
     
     #code to escape from enemies close
     
+    #if we have reached our destination, change this units destination to a placeholder representing
+    #that it has been reached.
     try:
         if unit.location.map_location() == Memory.destinations[unit.id]:
             Memory.destinations[unit.id] = Constants.DESTINATION_REACHED
     except:
-        #do nothing
+        #do nothing - here so that we don't get an error if the destination hasn't been reached
         placeHolder = True
     
+    #if we don't have enough workers, 
     if MyVars.workerCount < Constants.DESIRED_WORKERS and gc.karbonite() >= Constants.REPLICATE_COST:
         direct = getNeighbors(unit.location.map_location())
         for i in range(len(direct)):
@@ -286,6 +284,7 @@ def WorkerLogic(unit):
                 gc.replicate(unit.id, direction)
                 MyVars.workerCount += 1
     else:
+        #get locations which are passable nearby
         validLocs = getNeighbors(unit.location.map_location())
         
         #get nearby units and build them if possible
@@ -315,19 +314,20 @@ def WorkerLogic(unit):
         
         #walk towards the best karbonite spot on the map
         try:
-            #print(Memory.destinations)
+            #get the destination that this unit is supposed to be going to
             destination = Memory.destinations[unit.id]
-            #print("Got destination for unit " + str(unit.id) + "!")
-            #print(destination)
+            #if we already reached that destination: get a new one
             if destination == Constants.DESTINATION_REACHED:
                 print("Destination was reached already so getting a new one")
                 destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
                 Memory.destinations[unit.id] = destination
         except:
+            #this will only happen the first time a destination is generated for a spot
             print("There was no destination stored for unit " + str(unit.id) + " so we had to make one!")
             destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
             Memory.destinations[unit.id] = destination
             
+        #move in the correct direction to get to our destination if possible.
         myDirection = BFS_firstStep(unit, destination) 
         if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
             gc.move_robot(unit.id, myDirection)
