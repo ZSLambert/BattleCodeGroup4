@@ -350,7 +350,15 @@ def ranger_logic():
     myDirection = directions[random.randint(0,7)]
     if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
         gc.move_robot(unit.id, myDirection)
-    
+
+        
+def mage_logic():
+
+
+
+def healer_logic():
+
+
 while True:
     # We only support Python 3, which means brackets around print()
     print('pyround:', gc.round(), 'time left:', gc.get_time_left_ms(), 'ms')
@@ -376,8 +384,14 @@ while True:
                 location = unit.location
                 if location.is_on_map():
                     ranger_logic()
-                    
-            
+            elif unit.unit_type == bc.UnitType.Mage
+                location = unit.location
+                if location.is_on_map():
+                    mage_logic()
+            elif unit.unit_type == bc.UnitType.Healer
+                location = unit.location
+                if location.is_on_map():
+                    healer_logic()
             # first, factory logic
             elif unit.unit_type == bc.UnitType.Factory:
                 garrison = unit.structure_garrison()
