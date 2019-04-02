@@ -352,11 +352,11 @@ def ranger_logic():
         gc.move_robot(unit.id, myDirection)
 
         
-def mage_logic():
+#def mage_logic():
 
 
 
-def healer_logic():
+#def healer_logic():
 
 
 while True:
