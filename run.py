@@ -380,7 +380,6 @@ while True:
             if unit.unit_type == bc.UnitType.Worker:
                 WorkerLogic(unit)
             elif unit.unit_type == bc.UnitType.Ranger:
-                #In the future, we will use ranger logic here.  Basic logic so we attack:
                 location = unit.location
                 if location.is_on_map():
                     ranger_logic()
