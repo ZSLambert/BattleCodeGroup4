@@ -48,6 +48,8 @@ class Constants:
     RANGER_VISION = 70
     WKH_VISION = 50
     MAGE_VISION = 30
+    HEALER_VISION = 50
+    HEALER_RANGE = 30
     RANGER_RANGE = 50
     MH_RANGE = 30
     KNIGHT_RANGE = 2
@@ -450,7 +452,45 @@ def ranger_logic():
     nearby= gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
     for place in nearby:
         if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-            print("Attacked a unit!")
+            print("Ranger attacked a unit!")
+            gc.attack(unit.id, place.id)
+            continue
+    for place in nearby:
+        if place.team != my_team and not gc.can_attack(unit.id, place.id):
+            myDirection = BFS_firstStep(unit, place.location.map_location())
+            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                gc.move_robot(unit.id, myDirection)
+                continue
+    myDirection = directions[random.randint(0,7)]
+    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+        gc.move_robot(unit.id, myDirection)
+
+        
+def mage_logic():
+    #same as ranger logic but for the mages
+    nearby= gc.sense_nearby_units(location.map_location(), Constants.MAGE_VISION)
+    for place in nearby:
+        if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
+            print("Mage attacked a unit!")
+            gc.attack(unit.id, place.id)
+            continue
+    for place in nearby:
+        if place.team != my_team and not gc.can_attack(unit.id, place.id):
+            myDirection = BFS_firstStep(unit, place.location.map_location())
+            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                gc.move_robot(unit.id, myDirection)
+                continue
+    myDirection = directions[random.randint(0,7)]
+    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+        gc.move_robot(unit.id, myDirection)
+
+
+def healer_logic():
+    #same as ranger logic but for the Healer. the healer attacks our teams units to heal them.
+    nearby= gc.sense_nearby_units(location.map_location(), Constants.HEALER_VISION)
+    for place in nearby:
+        if place.team == my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
+            print("Healed a unit!")
             gc.attack(unit.id, place.id)
             continue
     for place in nearby:
@@ -490,12 +530,18 @@ while True:
             #print("Working with unit " + str(unit.id))
             if unit.unit_type == bc.UnitType.Worker:
                 WorkerLogic(unit)
-                continue
             elif unit.unit_type == bc.UnitType.Ranger:
-                #In the future, we will use ranger logic here.  Basic logic so we attack:
                 location = unit.location
                 if location.is_on_map():
                     ranger_logic()
+            elif unit.unit_type == bc.UnitType.Mage:
+                location = unit.location
+                if location.is_on_map():
+                    mage_logic()
+            elif unit.unit_type == bc.UnitType.Healer:
+                location = unit.location
+                if location.is_on_map():
+                    healer_logic()
                     
             
             # first, factory logic
