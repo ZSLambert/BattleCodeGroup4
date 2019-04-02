@@ -305,6 +305,7 @@ def WorkerLogic(unit):
                 else:
                     karboniteMapMars[harvestedLoc.x][harvestedLoc.y] = gc.karbonite_at(harvestedLoc)
                 return
+
         #try to build a factory blueprint if we don't have enough and have sufficient karbonite
         if gc.karbonite() > Constants.FACTORY_COST and MyVars.factoryCount < Constants.DESIRED_FACTORIES:
             for loc in validLocs:
@@ -341,8 +342,6 @@ def ranger_logic():
     #sense enemies
     nearby = gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
 
-    destination = Memory.combat_dest[unit.id]
-
     for place in nearby:
         if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
             print("Attacked a unit!")
@@ -354,6 +353,13 @@ def ranger_logic():
             if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
                 gc.move_robot(unit.id, myDirection)
                 continue
+    try:
+        #could we change this to find enemy Karbonite? 
+          destination = Memory.combat_dest[unit.id]
+          if destination == Constants.DESTINATION_REACHED:
+                print("Destination was reached already so getting a new one")
+                destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
+                Memory.combat_dest[unit.id] = destination
 
     #have enemy walk toward enemy start 
     myDirection = BFS_firstStep(unit, destination)
