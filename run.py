@@ -434,6 +434,7 @@ for i in range(marsWidth):
             karboniteMapMars[i][j] = int(marsMap.initial_karbonite_at(loc))
         passableMapMars[i][j] = marsMap.is_passable_terrain_at(loc)
         
+
 #now, on earth, try to scale the amount of karbonite so that places close to the enemy aren't listed as
 #having any.  Also, remove any places that are unreachable by our people.
 
@@ -444,6 +445,25 @@ Constants.INITIAL_KARB_COUNT = totalCount
 for cluster in Memory.reachable_clusters:
     print(len(cluster))
         
+
+def ranger_logic():
+    nearby= gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
+    for place in nearby:
+        if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
+            print("Attacked a unit!")
+            gc.attack(unit.id, place.id)
+            continue
+    for place in nearby:
+        if place.team != my_team and not gc.can_attack(unit.id, place.id):
+            myDirection = BFS_firstStep(unit, place.location.map_location())
+            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                gc.move_robot(unit.id, myDirection)
+                continue
+    myDirection = directions[random.randint(0,7)]
+    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+        gc.move_robot(unit.id, myDirection)
+    
+
 while True:
     # We only support Python 3, which means brackets around print()
     print('pyround:', gc.round(), 'time left:', gc.get_time_left_ms(), 'ms')
@@ -475,22 +495,8 @@ while True:
                 #In the future, we will use ranger logic here.  Basic logic so we attack:
                 location = unit.location
                 if location.is_on_map():
-                    nearby= gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
-                    for place in nearby:
-                        if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-                            print("Attacked a unit!")
-                            gc.attack(unit.id, place.id)
-                            continue
-                    for place in nearby:
-                        if place.team != my_team and not gc.can_attack(unit.id, place.id):
-                            myDirection = BFS_firstStep(unit, place.location.map_location())
-                            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                                gc.move_robot(unit.id, myDirection)
-                                continue
-                    myDirection = directions[random.randint(0,7)]
-                    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                        gc.move_robot(unit.id, myDirection)
-                        continue
+                    ranger_logic()
+                    
             
             # first, factory logic
             elif unit.unit_type == bc.UnitType.Factory:
