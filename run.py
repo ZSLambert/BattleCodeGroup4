@@ -336,7 +336,13 @@ def WorkerLogic(unit):
             gc.move_robot(unit.id, myDirection)
             return
         
-        
+def mage_logic():
+    print("")
+
+
+def healer_logic():  
+    print("")
+
 def ranger_logic():
 
     #sense enemies
