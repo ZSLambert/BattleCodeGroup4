@@ -141,6 +141,7 @@ for unit in gc.my_units():
 
 for point in startPoints:
     enemyStartPoints.append(invertPoint(point, bc.Planet.Earth))
+    Memory.combat_dest[invertPoint(point, bc.Planet.Earth)]
     
 #determines whether a map location is on the map based on its x and y coordinates  
 def onMap(loc):
