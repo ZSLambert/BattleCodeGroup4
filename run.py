@@ -530,18 +530,22 @@ while True:
             #print("Working with unit " + str(unit.id))
             if unit.unit_type == bc.UnitType.Worker:
                 WorkerLogic(unit)
+                continue
             elif unit.unit_type == bc.UnitType.Ranger:
                 location = unit.location
                 if location.is_on_map():
                     ranger_logic()
+                    continue
             elif unit.unit_type == bc.UnitType.Mage:
                 location = unit.location
                 if location.is_on_map():
                     mage_logic()
+                    continue
             elif unit.unit_type == bc.UnitType.Healer:
                 location = unit.location
                 if location.is_on_map():
                     healer_logic()
+                    continue
                     
             
             # first, factory logic
@@ -554,9 +558,19 @@ while True:
                         gc.unload(unit.id, d)
                         continue
                 elif gc.can_produce_robot(unit.id, bc.UnitType.Ranger):
-                    #gc.produce_robot(unit.id, bc.UnitType.Ranger)
-                    print('produced a ranger!')
-                    continue
+                    toproduce = random.randint(0,2)
+                    if toproduce == 0:
+                        gc.produce_robot(unit.id, bc.UnitType.Ranger)
+                        print('produced a ranger!')
+                        continue
+                    elif toproduce == 1:
+                        gc.produce_robot(unit.id, bc.UnitType.Mage)
+                        print('produced a Mage!')
+                        continue
+                    elif toproduce == 2:
+                        gc.produce_robot(unit.id, bc.UnitType.Healer)
+                        print('produced a healer!')
+                        continue
 
             # first, let's look for nearby blueprints to work on
             location = unit.location
