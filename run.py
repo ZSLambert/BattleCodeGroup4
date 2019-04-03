@@ -25,8 +25,8 @@ class Memory:
 
 class Constants:
     LAUNCH_BY = 749
-    DESIRED_WORKERS = 5
-    DESIRED_FACTORIES = 3
+    DESIRED_WORKERS = 10
+    DESIRED_FACTORIES = 4
     DIRECTION_CHANGES = [(0,1),(0,-1),(1,0),(-1,0),(1,1),(-1,-1),(1,-1),(-1,1)]
     REPLICATE_COST = 60
     WORKER_COST = 50
@@ -45,6 +45,7 @@ class Constants:
         bc.Direction.Northeast: (1,1),
         bc.Direction.Northwest: (-1,1)
     }
+    DESTINATION_REACHED = [(-1000,-1000)]
     RANGER_VISION = 70
     WKH_VISION = 50
     MAGE_VISION = 30
