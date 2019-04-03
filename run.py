@@ -468,70 +468,13 @@ Constants.INITIAL_KARB_COUNT = totalCount
 for cluster in Memory.reachable_clusters:
     print(len(cluster))
         
-
-def ranger_logic():
-    nearby= gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
-    for place in nearby:
-        if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-            print("Ranger attacked a unit!")
-            gc.attack(unit.id, place.id)
-            continue
-    for place in nearby:
-        if place.team != my_team and not gc.can_attack(unit.id, place.id):
-            myDirection = BFS_firstStep(unit, place.location.map_location())
-            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                gc.move_robot(unit.id, myDirection)
-                continue
-    myDirection = directions[random.randint(0,7)]
-    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-        gc.move_robot(unit.id, myDirection)
-
-        
-def mage_logic():
-    #same as ranger logic but for the mages
-    nearby= gc.sense_nearby_units(location.map_location(), Constants.MAGE_VISION)
-    for place in nearby:
-        if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-            print("Mage attacked a unit!")
-            gc.attack(unit.id, place.id)
-            continue
-    for place in nearby:
-        if place.team != my_team and not gc.can_attack(unit.id, place.id):
-            myDirection = BFS_firstStep(unit, place.location.map_location())
-            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                gc.move_robot(unit.id, myDirection)
-                continue
-    myDirection = directions[random.randint(0,7)]
-    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-        gc.move_robot(unit.id, myDirection)
-
-
-def healer_logic():
-    #same as ranger logic but for the Healer. the healer attacks our teams units to heal them.
-    nearby= gc.sense_nearby_units(location.map_location(), Constants.HEALER_VISION)
-    for place in nearby:
-        if place.team == my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-            print("Healed a unit!")
-            gc.attack(unit.id, place.id)
-            continue
-    for place in nearby:
-        if place.team != my_team and not gc.can_attack(unit.id, place.id):
-            myDirection = BFS_firstStep(unit, place.location.map_location())
-            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                gc.move_robot(unit.id, myDirection)
-                continue
-    myDirection = directions[random.randint(0,7)]
-    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-        gc.move_robot(unit.id, myDirection)
-    
-
 while True:
     # We only support Python 3, which means brackets around print()
     print('pyround:', gc.round(), 'time left:', gc.get_time_left_ms(), 'ms')
     # frequent try/catches are a good idea
     try:
         
-        if(gc.round() % 50 == 0):
+        if(gc.round() % 100 == 0):
             print("Current karbonite map is:")
             count = 0
             for i in range(len(karboniteMapEarth)):
@@ -556,19 +499,22 @@ while True:
                 #In the future, we will use ranger logic here.  Basic logic so we attack:
                 location = unit.location
                 if location.is_on_map():
-                    ranger_logic()
-                    continue
-            elif unit.unit_type == bc.UnitType.Mage:
-                location = unit.location
-                if location.is_on_map():
-                    mage_logic()
-                    continue
-            elif unit.unit_type == bc.UnitType.Healer:
-                location = unit.location
-                if location.is_on_map():
-                    healer_logic()
-                    continue
-                    
+                    nearby= gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
+                    for place in nearby:
+                        if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
+                            print("Attacked a unit!")
+                            gc.attack(unit.id, place.id)
+                            continue
+                    for place in nearby:
+                        if place.team != my_team and not gc.can_attack(unit.id, place.id):
+                            myDirection = BFS_firstStep(unit, place.location.map_location())
+                            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                                gc.move_robot(unit.id, myDirection)
+                                continue
+                    myDirection = directions[random.randint(0,7)]
+                    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                        gc.move_robot(unit.id, myDirection)
+                        continue
             
             # first, factory logic
             elif unit.unit_type == bc.UnitType.Factory:
@@ -580,19 +526,6 @@ while True:
                         gc.unload(unit.id, d)
                         continue
                 elif gc.can_produce_robot(unit.id, bc.UnitType.Ranger):
-                    toproduce = random.randint(0,2)
-                    if toproduce == 0:
-                        gc.produce_robot(unit.id, bc.UnitType.Ranger)
-                        print('produced a ranger!')
-                        continue
-                    elif toproduce == 1:
-                        gc.produce_robot(unit.id, bc.UnitType.Mage)
-                        print('produced a Mage!')
-                        continue
-                    elif toproduce == 2:
-                        gc.produce_robot(unit.id, bc.UnitType.Healer)
-                        print('produced a healer!')
-                        continue
                     #gc.produce_robot(unit.id, bc.UnitType.Ranger)
                     print('produced a ranger!')
                     continue
