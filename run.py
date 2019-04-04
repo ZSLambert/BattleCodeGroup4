@@ -67,6 +67,9 @@ class MyVars:
     knightCount = 0
     mageCount = 0
     healerCount = 0
+    rangerWeight = 0
+    mageWeight = 0
+    healerWeight = 25
     
 
 print("pystarted")
@@ -462,6 +465,13 @@ earthHeight = earthMap.height
 
 print("Earth is " + str(earthWidth) + "x" + str(earthHeight))
 
+if earthWidth >= 35 and earthHeight >= 35:
+    MyVars.rangerWeight = 45
+    MyVars.mageWeight = 30
+else:
+    MyVars.rangerWeight = 30
+    MyVars.mageWeight = 45
+
 marsWidth = marsMap.width
 marsHeight = marsMap.height
 
@@ -579,16 +589,16 @@ while True:
                         gc.unload(unit.id, d)
                         continue
                 elif gc.can_produce_robot(unit.id, bc.UnitType.Ranger):
-                    toproduce = random.randint(0,2)
-                    if toproduce == 0:
+                    toproduce = random.randint(0,(MyVars.mageWeight + MyVars.rangerWeight+ MyVars.healerWeight))
+                    if toproduce <= MyVars.rangerWeight:
                         gc.produce_robot(unit.id, bc.UnitType.Ranger)
                         print('produced a ranger!')
                         continue
-                    elif toproduce == 1:
+                    elif toproduce <= (MyVars.mageWeight + MyVars.rangerWeight):
                         gc.produce_robot(unit.id, bc.UnitType.Mage)
                         print('produced a Mage!')
                         continue
-                    elif toproduce == 2:
+                    elif toproduce <= (MyVars.mageWeight + MyVars.rangerWeight+ MyVars.healerWeight):
                         gc.produce_robot(unit.id, bc.UnitType.Healer)
                         print('produced a healer!')
                         continue
