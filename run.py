@@ -21,6 +21,7 @@ totalNearbyKarbTime = 0
 class Memory:
     destinations = {}
     reachable_clusters = []
+    combat_destinations = {}
     finishedKarb = False
 
 class Constants:
@@ -209,8 +210,10 @@ def getReachable(unit):
                 queue.append(adjLoc)
     return visited
 
+
 def mapReachable():
     for unit in gc.my_units():
+        #make a coordinate from the location
         loc = unit.location.map_location().x, unit.location.map_location().y
         alreadySearched = False
         for cluster in Memory.reachable_clusters:
@@ -246,12 +249,18 @@ def nearbyKarb(location, planet):
     startT = int(round(time.time() * 1000))
     
     
+    locCluster = []
+    for cluster in Memory.reachable_clusters:
+        if (location.x, location.y) in cluster:
+            locCluster = cluster
+    
     minDist = 100000
     minDistLoc = location
     for key in karboniteMapEarth:
         #print("Checking " + str(key))
-        if key in takenDest:
+        if key in takenDest or key not in locCluster:
             #we dont want to send two workers to the exact same place
+            #we also dont want to bother returning a spot thats not reachable
             continue
         tempDist = pow(location.x - key[0], 2) + pow(location.y - key[1], 2)
         if tempDist < minDist:
@@ -265,6 +274,51 @@ def locFromDirect(unit, direction):
     location = unit.location.map_location()
     change = Constants.CHANGE_FROM_DIRECT[direction]
     return bc.MapLocation(location.planet, location.x + change[0], location.y + change[1])
+
+def moveWorker(unit):
+    
+    try:
+        #get the destination that this unit is supposed to be going to
+        path = Memory.destinations[unit.id]
+        #if we already reached that destination: get a new one
+        if path == Constants.DESTINATION_REACHED:
+            destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
+            path = BFS_firstStep(unit, destination)
+            Memory.destinations[unit.id] = path
+    except:
+        #this will only happen the first time a destination is generated for a spot
+        destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
+
+        path = BFS_firstStep(unit, destination)
+
+        Memory.destinations[unit.id] = path
+
+    #move in the correct direction to get to our destination if possible.
+
+    nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
+
+
+    myDirection = unit.location.map_location().direction_to(nextStep)
+
+    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+        gc.move_robot(unit.id, myDirection)
+        #remove the first step of the path that we had.
+
+        Memory.destinations[unit.id] = path[1:]
+        if (Memory.destinations[unit.id] == []):
+            Memory.destinations[unit.id] = Constants.DESTINATION_REACHED
+        return
+    else:
+        if not gc.is_move_ready(unit.id):
+            print("Movement is on cooldown")
+        else:
+            print("Bad direction to move to")
+            destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
+
+            path = BFS_firstStep(unit, destination)
+
+            Memory.destinations[unit.id] = path
+
 
 def WorkerLogic(unit):
     ##priorities should be:
@@ -344,60 +398,7 @@ def WorkerLogic(unit):
                     return
                 
         if len(karboniteMapEarth) > 0:
-            #walk towards the best karbonite spot on the map
-            try:
-                #get the destination that this unit is supposed to be going to
-                path = Memory.destinations[unit.id]
-                #if we already reached that destination: get a new one
-                if path == Constants.DESTINATION_REACHED:
-                    #print("Destination was reached already so getting a new one")
-                    destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
-                    path = BFS_firstStep(unit, destination)
-                    Memory.destinations[unit.id] = path
-            except:
-                #this will only happen the first time a destination is generated for a spot
-                #print("There was no destination stored for unit " + str(unit.id) + " so we had to make one!")
-                destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
-
-                path = BFS_firstStep(unit, destination)
-                #if destination == None:
-                #    print("WE HAVE HARVESTED ALL KARBONITE ON EARTH YAY!")
-
-                Memory.destinations[unit.id] = path
-
-            #move in the correct direction to get to our destination if possible.
-
-            #print(path)
-
-
-            nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
-
-            #print("I'm at " + str(unit.location.map_location().x) + "," + str(unit.location.map_location().y) + " and my next step is " + str(path[0][0]) + "," + str(path[0][1]))
-
-            myDirection = unit.location.map_location().direction_to(nextStep)
-            #print(myDirection)
-
-            #print("Trying to move towards: " + str(destination.x) + "," + str(destination.y))
-
-            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                gc.move_robot(unit.id, myDirection)
-                #remove the first step of the path that we had.
-                Memory.destinations[unit.id] = path[1:]
-                if (Memory.destinations[unit.id] == []):
-                    Memory.destinations[unit.id] = Constants.DESTINATION_REACHED
-                return
-            else:
-                if not gc.is_move_ready(unit.id):
-                    print("Movement is on cooldown")
-                else:
-                    print("Bad direction to move to")
-                    destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
-
-                    path = BFS_firstStep(unit, destination)
-                    #if destination == None:
-                    #    print("WE HAVE HARVESTED ALL KARBONITE ON EARTH YAY!")
-
-                    Memory.destinations[unit.id] = path
+            moveWorker(unit)
 
 def karbMultiplier(location):
     minDistEnemy = 1000000
