@@ -610,6 +610,12 @@ def WorkerLogic(unit):
 
         if len(karboniteMapEarth) > 0:
             moveWorker(unit)
+        else:
+            
+            for direct in directions:
+                if gc.is_occupiable(direct) and gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                    gc.move_robot(unit.id, direct)
+                    return
 
 
 def karbMultiplier(location):
@@ -705,7 +711,7 @@ def ranger_logic(unit):
             # print(place)
             print("Ranger attacked a unit!")
             gc.attack(unit.id, place.id)
-            continue
+            return
 
     # commented out since this is broken right now
     # for place in nearby:
@@ -746,14 +752,8 @@ def mage_logic(unit):
         if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
             print("Mage attacked a unit!")
             gc.attack(unit.id, place.id)
-            continue
-    # commented out since this is broken right now
-    # for place in nearby:
-    #    if place.team != my_team and not gc.can_attack(unit.id, place.id):
-    #        myDirection = BFS_firstStep(unit, place.location.map_location())[-1]
-    #        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-    #            gc.move_robot(unit.id, myDirection)
-    #            continue
+            return
+            
     moveCombatUnit(unit)
 
 
@@ -781,18 +781,12 @@ def healer_logic(unit):
         if place.team == my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
             print("Healed a unit!")
             gc.attack(unit.id, place.id)
-            continue
-    # commented out since this is broken right now
-    # for place in nearby:
-    #    if place.team != my_team and not gc.can_attack(unit.id, place.id):
-    #        myDirection = BFS_firstStep(unit, place.location.map_location())[-1]
-    #        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-    #            gc.move_robot(unit.id, myDirection)
-    #            continue
-    myDirection = directions[random.randint(0, 7)]
-    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-        gc.move_robot(unit.id, myDirection)
+            return
 
+    for direct in directions:
+        if gc.is_occupiable(direct) and gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+            gc.move_robot(unit.id, direct)
+            return
     ###INITIAL SETUP###
 
 
