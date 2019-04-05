@@ -80,10 +80,10 @@ class MyVars:
     knightCount = 0
     mageCount = 0
     healerCount = 0
-    rangerWeight = 5
-    mageWeight = 5
-    healerWeight = 15
-    workerWeight = 25
+    rangerWeight = 10
+    mageWeight = 10
+    healerWeight = 10
+    workerWeight = 5
 
     marsWorkerCount = 0
     marsRangerCount = 0
@@ -612,10 +612,13 @@ def WorkerLogic(unit):
             moveWorker(unit)
         else:
             
-            for direct in directions:
-                if gc.can_move(unit.id, direct) and gc.is_move_ready(unit.id):
-                    gc.move_robot(unit.id, direct)
-                    return
+            direct = directions[random.randint(0, 7)]
+            while not gc.can_move(unit.id, direct):
+                direct = directions[random.randint(0, 7)]
+            
+            if gc.can_move(unit.id, direct) and gc.is_move_ready(unit.id):
+                gc.move_robot(unit.id, direct)
+                return
 
 
 def karbMultiplier(location):
@@ -783,10 +786,13 @@ def healer_logic(unit):
             gc.attack(unit.id, place.id)
             return
 
-    for direct in directions:
-        if gc.can_move(unit.id, direct) and gc.is_move_ready(unit.id):
-            gc.move_robot(unit.id, direct)
-            return
+    direct = directions[random.randint(0, 7)]
+    while not gc.can_move(unit.id, direct):
+        direct = directions[random.randint(0, 7)]
+    
+    if gc.can_move(unit.id, direct) and gc.is_move_ready(unit.id):
+        gc.move_robot(unit.id, direct)
+        return
     ###INITIAL SETUP###
 
 
