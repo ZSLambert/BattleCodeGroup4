@@ -80,9 +80,9 @@ class MyVars:
     knightCount = 0
     mageCount = 0
     healerCount = 0
-    rangerWeight = 0
-    mageWeight = 0
-    healerWeight = 25
+    rangerWeight = 5
+    mageWeight = 5
+    healerWeight = 15
     workerWeight = 25
 
     marsWorkerCount = 0
@@ -770,12 +770,12 @@ earthHeight = earthMap.height
 
 print("Earth is " + str(earthWidth) + "x" + str(earthHeight))
 
-if earthWidth >= 35 and earthHeight >= 35:
-    MyVars.rangerWeight = 45
-    MyVars.mageWeight = 30
+if earthWidth >= 25 and earthHeight >= 25:
+    MyVars.rangerWeight += 45
+    MyVars.mageWeight += 30
 else:
-    MyVars.rangerWeight = 30
-    MyVars.mageWeight = 45
+    MyVars.rangerWeight += 30
+    MyVars.mageWeight += 45
 
 marsWidth = marsMap.width
 marsHeight = marsMap.height
