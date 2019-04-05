@@ -613,7 +613,7 @@ def WorkerLogic(unit):
         else:
             
             for direct in directions:
-                if gc.is_occupiable(direct) and gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                if gc.can_move(unit.id, direct) and gc.is_move_ready(unit.id):
                     gc.move_robot(unit.id, direct)
                     return
 
@@ -784,7 +784,7 @@ def healer_logic(unit):
             return
 
     for direct in directions:
-        if gc.is_occupiable(direct) and gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+        if gc.can_move(unit.id, direct) and gc.is_move_ready(unit.id):
             gc.move_robot(unit.id, direct)
             return
     ###INITIAL SETUP###
