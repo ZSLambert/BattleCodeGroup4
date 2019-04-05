@@ -196,10 +196,6 @@ def BFS_firstStep(unit, destination):
             totalBFSTime += int(round(time.time() * 1000)) - startT
             # debugging in case we ever have the same destination as start point
             if len(path) == 1:
-                print(path)
-                print(startLoc)
-                print(destLoc)
-                print("Destination was the start point")
                 return Constants.DESTINATION_REACHED
             return path[1:]
 
@@ -213,9 +209,6 @@ def BFS_firstStep(unit, destination):
                 queue.append(adjLoc)
         # current bugFix - hoping to remove in the future - handles cases where we are trying to reach an unreachable destination.
     unreachableTime += int(round(time.time() * 1000)) - startT
-    print("Destination was unreachable")
-    print("Start: " + str(startLoc))
-    print("Destination: " + str(destLoc))
     return Constants.DESTINATION_REACHED
 
 
@@ -308,7 +301,6 @@ def moveCombatUnit(unit):
     curPlanet = unit.location.map_location().planet
     print(curPlanet)
 
-    print("Destination for me is " + str(Memory.combat_destinations[unit.id]))
 
     destination = bc.MapLocation(curPlanet, Memory.combat_destinations[unit.id][0],
                                  Memory.combat_destinations[unit.id][1])
@@ -319,8 +311,7 @@ def moveCombatUnit(unit):
         if not earthMap.is_passable_terrain_at(destination):
             return
     except:
-        print(str(destination) + " was not on the map")
-
+        placeHolder = True
     try:
         # get the destination that this unit is supposed to be going to
         path = Memory.combat_paths[unit.id]
@@ -350,13 +341,11 @@ def moveCombatUnit(unit):
         return
     else:
         if not gc.is_move_ready(unit.id):
-            print("Movement is on cooldown - combat")
+            placeHolder = True
+            #print("Movement is on cooldown - combat")
         else:
-            print("Bad direction to move to - combat")
-            # destination = bc.MapLocation(curPlanet, Constants.ENEMY_START_POINTS[0][0], Constants.ENEMY_START_POINTS[0][1])
-            # path = BFS_firstStep(unit, destination)
-
-            # Memory.combat_paths[unit.id] = path
+            placeHolder = True
+            #print("Bad direction to move to - combat")
 
 def moveWorker(unit):
     try:
@@ -391,25 +380,22 @@ def moveWorker(unit):
         return
     else:
         if not gc.is_move_ready(unit.id):
-            print("Movement is on cooldown - worker")
+            placeHolder = True
+            #print("Movement is on cooldown - worker")
         else:
-            print("Bad direction to move to - worker")
-            destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
-
-            path = BFS_firstStep(unit, destination)
-
-            Memory.worker_paths[unit.id] = path
+            #print("Bad direction to move to - worker")
+            avoidObstacle(unit)
 
 
 def moveMarsUnit(unit):
     curPlanet = unit.location.map_location().planet
 
-    print("Destination for me is " + str(Memory.rocket_destinations[unit.id]))
+    #print("Destination for me is " + str(Memory.rocket_destinations[unit.id]))
 
     destination = bc.MapLocation(curPlanet, Memory.rocket_destinations[unit.id][0],
                                  Memory.rocket_destinations[unit.id][1])
 
-    print(destination)
+    #print(destination)
 
     try:
         # get the destination that this unit is supposed to be going to
@@ -439,13 +425,70 @@ def moveMarsUnit(unit):
         return
     else:
         if not gc.is_move_ready(unit.id):
-            print("Movement is on cooldown - Troops for mars")
+            placeHolder = True
+            #print("Movement is on cooldown - Troops for mars")
         else:
-            print("Bad direction to move to - Troops for mars")
-            # destination = bc.MapLocation(curPlanet, Constants.ENEMY_START_POINTS[0][0], Constants.ENEMY_START_POINTS[0][1])
-            # path = BFS_firstStep(unit, destination)
+            placeHolder = True
+            #print("Bad direction to move to - Troops for mars")
+            
+def avoidObstacle(unit):
+    planet = unit.location.map_location().planet
+    myPath = Memory.worker_paths[unit.id]
+    obstacle = myPath[0]
+    dest = myPath[0]
+    for i in range(1, len(myPath)):
+        try:
+            if gc.is_occupiable(planet, myPath[i][0], myPath[i][1]):
+                dest = path[i]
+                ##exit the loop
+                i = len(path) + 1
+        except:
+            #print(i)
+            #print("This is so blocked off we can't find a free spot to go to in the path")
+            return
+                  
+    finalPath = []
+    orig = unit.location.map_location().x, unit.location.map_location().y
+    visited = []
+    parent = {}
+    queue = [orig]
+    while queue:
+        node = queue.pop(0)
+        visited.append(node)
+        if node == dest:
+            #starts a list which will track the entire path from the end to the exit
+            #ends up reversing it and returning the location of the first step
+            path = [destLoc]
+            while path[-1] != orig:
+                path.append(parent[path[-1]])
+            path.reverse()
+            if len(path) == 1:
+                #print("Destination was the start point")
+                return
+            finalPath = path[1:]
+        
+        neighbors = getNeighbors(bc.MapLocation(planet, node[0], node[1]))
+        
+        
+        for adjacent in getNeighbors(bc.MapLocation(planet, node[0], node[1])):
+            try:
+                if gc.is_occupiable(adjacent):
 
-            # Memory.combat_paths[unit.id] = path
+                    adjLoc = (adjacent.x, adjacent.y)
+
+                    if adjLoc not in visited and adjLoc not in queue:
+                        parent[adjLoc] = node # <<<<< record the parent of the node - used to get the path
+                        queue.append(adjLoc)
+            except:
+                placeHolder = True
+                #print(adjacent)
+                #print("That was an out of bounds neighbor")
+    if len(finalPath) > 0:
+        gc.move_robot(unit.id, gc.direction_to(bc.MapLocation(planet, finalPath[0][0], finalPath[0][1])))
+        movedLoc = unit.location.map_location().x, unit.location.map_location().y
+        if movedLoc in path:
+            indexOf = path.index(movedLoc)
+            Memory.worker_paths[unit.id] = path[indexOf+1:]
 
 
 def WorkerLogic(unit):
@@ -502,7 +545,7 @@ def WorkerLogic(unit):
         nearby = gc.sense_nearby_units(unit.location.map_location(), 2)
         for tempUnit in nearby:
             if gc.can_build(unit.id, tempUnit.id):
-                print("Building!")
+                #print("Building!")
                 gc.build(unit.id, tempUnit.id)
                 return
         # harvest any karbonite that is near us
@@ -637,7 +680,7 @@ def ranger_logic(unit):
 
     if unit.id not in Memory.combat_destinations:
         randNum = random.randint(0, len(Constants.ENEMY_START_POINTS) - 1)
-        print("We'll be going towards the " + str(randNum) + " starting point.")
+        #print("We'll be going towards the " + str(randNum) + " starting point.")
         Memory.combat_destinations[unit.id] = Constants.ENEMY_START_POINTS[randNum]
 
     nearby = gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
@@ -754,8 +797,8 @@ def healer_logic(unit):
 
 
 # get initial variables and maps
-gc.queue_research(bc.UnitType.Rocket)
 gc.queue_research(bc.UnitType.Worker)
+gc.queue_research(bc.UnitType.Rocket)
 gc.queue_research(bc.UnitType.Mage)
 gc.queue_research(bc.UnitType.Healer)
 gc.queue_research(bc.UnitType.Ranger)
@@ -846,15 +889,15 @@ while True:
     try:
         # print("Combat paths are:")
         # print(Memory.combat_paths)
-        if (gc.round() % 100 == 0):
-            print("Current karbonite map is:")
-            count = 0
-            for key in karboniteMapEarth:
-                count += karboniteMapEarth[key]
-            print("There is " + str(count) + " karbonite remaining")
+        #if (gc.round() % 100 == 0):
+        #    print("Current karbonite map is:")
+        #    count = 0
+        #    for key in karboniteMapEarth:
+        #        count += karboniteMapEarth[key]
+        #    print("There is " + str(count) + " karbonite remaining")
 
-            print(Memory.worker_paths)
-            print(Memory.combat_paths)
+        #    print(Memory.worker_paths)
+        #    print(Memory.combat_paths)
         if gc.round() > 25:
             Constants.HARVEST_AMOUNT = 4
         # walk through our units:
