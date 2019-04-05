@@ -18,6 +18,8 @@ directions = list(bc.Direction)
 totalBFSTime = 0
 totalNearbyKarbTime = 0
 unreachableTime = 0
+avoidanceTime = 0
+successCount = 0
 
 class Memory:
     worker_paths = {}
@@ -155,7 +157,7 @@ def BFS_firstStep(unit, destination):
     startLoc = (start.x, start.y)
     destLoc = (destination.x, destination.y)
     
-    #print("Trying to get from " + str(startLoc) + " to " + str(destLoc))
+    ##print("Trying to get from " + str(startLoc) + " to " + str(destLoc))
     
     planet = start.planet
     
@@ -174,14 +176,14 @@ def BFS_firstStep(unit, destination):
             while path[-1] != startLoc:
                 path.append(parent[path[-1]])
             path.reverse()
-            #print("BFS took " + str(int(round(time.time() * 1000)) - startT) + " time.")
+            ##print("BFS took " + str(int(round(time.time() * 1000)) - startT) + " time.")
             totalBFSTime += int(round(time.time() *1000)) - startT
             #debugging in case we ever have the same destination as start point
             if len(path) == 1:
-                print(path)
-                print(startLoc)
-                print(destLoc)
-                print("Destination was the start point")
+                #print(path)
+                #print(startLoc)
+                #print(destLoc)
+                #print("Destination was the start point")
                 return Constants.DESTINATION_REACHED
             return path[1:]
         
@@ -196,9 +198,10 @@ def BFS_firstStep(unit, destination):
                 queue.append(adjLoc)
         #current bugFix - hoping to remove in the future - handles cases where we are trying to reach an unreachable destination.
     unreachableTime += int(round(time.time() *1000)) - startT
-    print("Destination was unreachable")
-    print("Start: " + str(startLoc))
-    print("Destination: " + str(destLoc))
+    print(str(startLoc) + " trying to get to " + str(destLoc) + " was unreachable.")
+    #print("Destination was unreachable")
+    #print("Start: " + str(startLoc))
+    #print("Destination: " + str(destLoc))
     return Constants.DESTINATION_REACHED
 
 def getReachable(unit):
@@ -261,8 +264,7 @@ def nearbyKarb(location, planet):
     locCluster = []
     for cluster in Memory.reachable_clusters:
         if (location.x, location.y) in cluster:
-            locCluster = cluster
-    
+            locCluster = cluster    
     minDist = 100000
     minDistLoc = location
     for key in karboniteMapEarth:
@@ -289,19 +291,20 @@ def moveCombatUnit(unit):
     
     
     curPlanet = unit.location.map_location().planet
-    print(curPlanet)
+    ##print(curPlanet)
     
-    print("Destination for me is " + str(Memory.combat_destinations[unit.id]))
+    ##print("Destination for me is " + str(Memory.combat_destinations[unit.id]))
     
     destination = bc.MapLocation(curPlanet, Memory.combat_destinations[unit.id][0], Memory.combat_destinations[unit.id][1])
     
-    print(destination)
+    #print(destination)
     try:
     
         if not earthMap.is_passable_terrain_at(destination):
             return
     except:
-        print(str(destination) + " was not on the map")
+        placeholder = True
+        #print(str(destination) + " was not on the map")
     
     try:
         #get the destination that this unit is supposed to be going to
@@ -333,9 +336,11 @@ def moveCombatUnit(unit):
         return
     else:
         if not gc.is_move_ready(unit.id):
-            print("Movement is on cooldown - combat")
+            placeholder = True
+            #print("Movement is on cooldown - combat")
         else:
-            print("Bad direction to move to - combat")
+            placeholder = True
+            #print("Bad direction to move to - combat")
             #destination = bc.MapLocation(curPlanet, Constants.ENEMY_START_POINTS[0][0], Constants.ENEMY_START_POINTS[0][1])
             #path = BFS_firstStep(unit, destination)
 
@@ -343,20 +348,27 @@ def moveCombatUnit(unit):
         
 
 def avoidObstacle(unit):
+    print("entered avoidance")
+    global avoidanceTime
+    global successCount
+    
+    startT = int(round(time.time() * 1000))
+    
     planet = unit.location.map_location().planet
     myPath = Memory.worker_paths[unit.id]
     obstacle = myPath[0]
     dest = myPath[0]
     for i in range(1, len(myPath)):
         try:
-            if gc.is_occupiable(planet, myPath[i][0], myPath[i][1]):
-                dest = path[i]
+            if gc.is_occupiable(bc.MapLocation(planet, myPath[i][0], myPath[i][1])):
+                dest = myPath[i]
                 ##exit the loop
-                i = len(path) + 1
+                i = len(myPath) + 1
         except:
-            print(i)
-            print("This is so blocked off we can't find a free spot to go to in the path")
             return
+            #print(i)
+            #print("This is so blocked off we can't find a free spot to go to in the path")
+            
                   
     finalPath = []
     orig = unit.location.map_location().x, unit.location.map_location().y
@@ -364,17 +376,23 @@ def avoidObstacle(unit):
     parent = {}
     queue = [orig]
     while queue:
+        if int(round(time.time()*1000)) - startT > 4.5:
+            print("Avoidance timed out")
+            Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
+            avoidanceTime += int(round(time.time() * 1000) - startT)
+            return
+            
         node = queue.pop(0)
         visited.append(node)
         if node == dest:
             #starts a list which will track the entire path from the end to the exit
             #ends up reversing it and returning the location of the first step
-            path = [destLoc]
+            path = [dest]
             while path[-1] != orig:
                 path.append(parent[path[-1]])
             path.reverse()
             if len(path) == 1:
-                print("Destination was the start point")
+                print("Destination was the start point - avoidance")
                 return
             finalPath = path[1:]
         
@@ -394,12 +412,15 @@ def avoidObstacle(unit):
                 placeHolder = True
                 #print(adjacent)
                 #print("That was an out of bounds neighbor")
+    avoidanceTime += int(round(time.time() * 1000) - startT)
     if len(finalPath) > 0:
-        gc.move_robot(unit.id, gc.direction_to(bc.MapLocation(planet, finalPath[0][0], finalPath[0][1])))
+        successCount += 1
+        gc.move_robot(unit.id, unit.location.map_location().direction_to(bc.MapLocation(planet, finalPath[0][0], finalPath[0][1])))
         movedLoc = unit.location.map_location().x, unit.location.map_location().y
         if movedLoc in path:
+            print("Shortening path!")
             indexOf = path.index(movedLoc)
-            Memory.combat_paths[unit.id] = path[indexOf+1:]
+            Memory.worker_paths[unit.id] = path[indexOf+1:]
     
             
     
@@ -439,9 +460,11 @@ def moveWorker(unit):
         return
     else:
         if not gc.is_move_ready(unit.id):
-            print("Movement is on cooldown - worker")
+            placeholder = True
+            #print("Movement is on cooldown - worker")
         else:
-            print("Bad direction to move to - worker")
+            
+            #print("Bad direction to move to - worker")
             avoidObstacle(unit)
 
 
@@ -479,7 +502,7 @@ def WorkerLogic(unit):
         nearby = gc.sense_nearby_units(unit.location.map_location(), 2)
         for tempUnit in nearby:
             if gc.can_build(unit.id, tempUnit.id):
-                print("Building!")
+                #print("Building!")
                 gc.build(unit.id, tempUnit.id)
                 return
         #harvest any karbonite that is near us
@@ -557,13 +580,13 @@ def ranger_logic(unit):
     
     if unit.id not in Memory.combat_destinations:
         randNum = random.randint(0,len(Constants.ENEMY_START_POINTS)-1)
-        print("We'll be going towards the " + str(randNum) + " starting point.")
+        #print("We'll be going towards the " + str(randNum) + " starting point.")
         Memory.combat_destinations[unit.id] = Constants.ENEMY_START_POINTS[randNum]
     
     nearby= gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
     for place in nearby:
         if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-            print("Ranger attacked a unit!")
+            #print("Ranger attacked a unit!")
             gc.attack(unit.id, place.id)
             continue
     #commented out since this is broken right now
@@ -586,7 +609,7 @@ def mage_logic(unit):
     nearby= gc.sense_nearby_units(location.map_location(), Constants.MAGE_VISION)
     for place in nearby:
         if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-            print("Mage attacked a unit!")
+            #print("Mage attacked a unit!")
             gc.attack(unit.id, place.id)
             continue
     #commented out since this is broken right now
@@ -605,7 +628,7 @@ def healer_logic(unit):
     nearby= gc.sense_nearby_units(location.map_location(), Constants.HEALER_VISION)
     for place in nearby:
         if place.team == my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-            print("Healed a unit!")
+            #print("Healed a unit!")
             gc.attack(unit.id, place.id)
             continue
     #commented out since this is broken right now
@@ -715,14 +738,14 @@ while True:
         #print("Combat paths are:")
         #print(Memory.combat_paths)
         if(gc.round() % 100 == 0):
-            print("Current karbonite map is:")
+            #print("Current karbonite map is:")
             count = 0
             for key in karboniteMapEarth:
                 count+=karboniteMapEarth[key]
             print("There is " + str(count) + " karbonite remaining")
             
-            print(Memory.worker_paths)
-            print(Memory.combat_paths)
+            #print(Memory.worker_paths)
+            #print(Memory.combat_paths)
         if gc.round() > 25:
             Constants.HARVEST_AMOUNT = 4
         # walk through our units:
@@ -807,6 +830,8 @@ while True:
     print("Nearby Karb took + " + str(totalNearbyKarbTime))
     print("BFS took + " + str(totalBFSTime))    
     print("Unreachable BFS took + " + str(unreachableTime))    
+    print("Avoidance took + " + str(avoidanceTime))    
+    print(str(successCount) + " successful avoidances of obstacles.")
 
     # send the actions we've performed, and wait for our next turn.
     gc.next_turn()
