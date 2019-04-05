@@ -17,10 +17,12 @@ directions = list(bc.Direction)
 
 totalBFSTime = 0
 totalNearbyKarbTime = 0
+unreachableTime = 0
 
 class Memory:
-    destinations = {}
+    worker_paths = {}
     reachable_clusters = []
+    combat_paths = {}
     combat_destinations = {}
     finishedKarb = False
 
@@ -70,7 +72,7 @@ class MyVars:
     healerCount = 0
     rangerWeight = 0
     mageWeight = 0
-    healerWeight = 25
+    healerWeight = 10
     
     factoryLocations = []
     rocketLocations = []
@@ -91,8 +93,8 @@ my_team = gc.team()
 def invertPoint(point, planet):
     ptX = point[0]
     ptY = point[1]
-    invertedX = earthMap.width - ptX
-    invertedY = earthMap.height - ptY
+    invertedX = earthMap.width - ptX - 1
+    invertedY = earthMap.height - ptY - 1
     
     return (invertedX, invertedY)
     
@@ -143,6 +145,7 @@ def evalFactorySpot(location):
 #current pathfinding algorithm
 def BFS_firstStep(unit, destination):
     global totalBFSTime
+    global unreachableTime
     #get the position of the unit that we are trying to move.
         
     startT = int(round(time.time() * 1000))
@@ -175,6 +178,9 @@ def BFS_firstStep(unit, destination):
             totalBFSTime += int(round(time.time() *1000)) - startT
             #debugging in case we ever have the same destination as start point
             if len(path) == 1:
+                print(path)
+                print(startLoc)
+                print(destLoc)
                 print("Destination was the start point")
                 return Constants.DESTINATION_REACHED
             return path[1:]
@@ -189,7 +195,10 @@ def BFS_firstStep(unit, destination):
                 parent[adjLoc] = node # <<<<< record the parent of the node - used to get the path
                 queue.append(adjLoc)
         #current bugFix - hoping to remove in the future - handles cases where we are trying to reach an unreachable destination.
+    unreachableTime += int(round(time.time() *1000)) - startT
     print("Destination was unreachable")
+    print("Start: " + str(startLoc))
+    print("Destination: " + str(destLoc))
     return Constants.DESTINATION_REACHED
 
 def getReachable(unit):
@@ -243,9 +252,9 @@ def getNeighbors(location):
 def nearbyKarb(location, planet):
     global totalNearbyKarbTime
     takenDest = []
-    for key in Memory.destinations:
+    for key in Memory.worker_paths:
         
-        takenDest.append(Memory.destinations[key][-1])
+        takenDest.append(Memory.worker_paths[key][-1])
     startT = int(round(time.time() * 1000))
     
     
@@ -267,6 +276,7 @@ def nearbyKarb(location, planet):
             minDist = tempDist
             minDistLoc = bc.MapLocation(location.planet, key[0], key[1])
     
+    totalNearbyKarbTime += int(round(time.time() *1000)) - startT
     return minDistLoc
 
 #given a unit and a direction, returns the location of the unit moved in that direction.
@@ -275,23 +285,36 @@ def locFromDirect(unit, direction):
     change = Constants.CHANGE_FROM_DIRECT[direction]
     return bc.MapLocation(location.planet, location.x + change[0], location.y + change[1])
 
-def moveWorker(unit):
+def moveCombatUnit(unit):
+    
+    
+    curPlanet = unit.location.map_location().planet
+    print(curPlanet)
+    
+    print("Destination for me is " + str(Memory.combat_destinations[unit.id]))
+    
+    destination = bc.MapLocation(curPlanet, Memory.combat_destinations[unit.id][0], Memory.combat_destinations[unit.id][1])
+    
+    print(destination)
+    try:
+    
+        if not earthMap.is_passable_terrain_at(destination):
+            return
+    except:
+        print(str(destination) + " was not on the map")
     
     try:
         #get the destination that this unit is supposed to be going to
-        path = Memory.destinations[unit.id]
+        path = Memory.combat_paths[unit.id]
         #if we already reached that destination: get a new one
         if path == Constants.DESTINATION_REACHED:
-            destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
             path = BFS_firstStep(unit, destination)
-            Memory.destinations[unit.id] = path
+            Memory.combat_paths[unit.id] = path
     except:
         #this will only happen the first time a destination is generated for a spot
-        destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
-
         path = BFS_firstStep(unit, destination)
 
-        Memory.destinations[unit.id] = path
+        Memory.combat_paths[unit.id] = path
 
     #move in the correct direction to get to our destination if possible.
 
@@ -304,20 +327,122 @@ def moveWorker(unit):
         gc.move_robot(unit.id, myDirection)
         #remove the first step of the path that we had.
 
-        Memory.destinations[unit.id] = path[1:]
-        if (Memory.destinations[unit.id] == []):
-            Memory.destinations[unit.id] = Constants.DESTINATION_REACHED
+        Memory.combat_paths[unit.id] = path[1:]
+        if (Memory.combat_paths[unit.id] == []):
+            Memory.combat_paths[unit.id] = Constants.DESTINATION_REACHED
         return
     else:
         if not gc.is_move_ready(unit.id):
-            print("Movement is on cooldown")
+            print("Movement is on cooldown - combat")
         else:
-            print("Bad direction to move to")
+            print("Bad direction to move to - combat")
+            #destination = bc.MapLocation(curPlanet, Constants.ENEMY_START_POINTS[0][0], Constants.ENEMY_START_POINTS[0][1])
+            #path = BFS_firstStep(unit, destination)
+
+            #Memory.combat_paths[unit.id] = path
+        
+
+def avoidObstacle(unit):
+    planet = unit.location.map_location().planet
+    myPath = Memory.worker_paths[unit.id]
+    obstacle = myPath[0]
+    dest = myPath[0]
+    for i in range(1, len(myPath)):
+        try:
+            if gc.is_occupiable(planet, myPath[i][0], myPath[i][1]):
+                dest = path[i]
+                ##exit the loop
+                i = len(path) + 1
+        except:
+            print(i)
+            print("This is so blocked off we can't find a free spot to go to in the path")
+            return
+                  
+    finalPath = []
+    orig = unit.location.map_location().x, unit.location.map_location().y
+    visited = []
+    parent = {}
+    queue = [orig]
+    while queue:
+        node = queue.pop(0)
+        visited.append(node)
+        if node == dest:
+            #starts a list which will track the entire path from the end to the exit
+            #ends up reversing it and returning the location of the first step
+            path = [destLoc]
+            while path[-1] != orig:
+                path.append(parent[path[-1]])
+            path.reverse()
+            if len(path) == 1:
+                print("Destination was the start point")
+                return
+            finalPath = path[1:]
+        
+        neighbors = getNeighbors(bc.MapLocation(planet, node[0], node[1]))
+        
+        
+        for adjacent in getNeighbors(bc.MapLocation(planet, node[0], node[1])):
+            try:
+                if gc.is_occupiable(adjacent):
+
+                    adjLoc = (adjacent.x, adjacent.y)
+
+                    if adjLoc not in visited and adjLoc not in queue:
+                        parent[adjLoc] = node # <<<<< record the parent of the node - used to get the path
+                        queue.append(adjLoc)
+            except:
+                placeHolder = True
+                #print(adjacent)
+                #print("That was an out of bounds neighbor")
+    if len(finalPath) > 0:
+        gc.move_robot(unit.id, gc.direction_to(bc.MapLocation(planet, finalPath[0][0], finalPath[0][1])))
+        movedLoc = unit.location.map_location().x, unit.location.map_location().y
+        if movedLoc in path:
+            indexOf = path.index(movedLoc)
+            Memory.combat_paths[unit.id] = path[indexOf+1:]
+    
+            
+    
+    
+def moveWorker(unit):
+    
+    try:
+        #get the destination that this unit is supposed to be going to
+        path = Memory.worker_paths[unit.id]
+        #if we already reached that destination: get a new one
+        if path == Constants.DESTINATION_REACHED:
             destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
-
             path = BFS_firstStep(unit, destination)
+            Memory.worker_paths[unit.id] = path
+    except:
+        #this will only happen the first time a destination is generated for a spot
+        destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
 
-            Memory.destinations[unit.id] = path
+        path = BFS_firstStep(unit, destination)
+
+        Memory.worker_paths[unit.id] = path
+
+    #move in the correct direction to get to our destination if possible.
+
+    nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
+
+
+    myDirection = unit.location.map_location().direction_to(nextStep)
+
+    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+        gc.move_robot(unit.id, myDirection)
+        #remove the first step of the path that we had.
+
+        Memory.worker_paths[unit.id] = path[1:]
+        if (Memory.worker_paths[unit.id] == []):
+            Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
+        return
+    else:
+        if not gc.is_move_ready(unit.id):
+            print("Movement is on cooldown - worker")
+        else:
+            print("Bad direction to move to - worker")
+            avoidObstacle(unit)
 
 
 def WorkerLogic(unit):
@@ -332,8 +457,8 @@ def WorkerLogic(unit):
     #if we have reached our destination, change this units destination to a placeholder representing
     #that it has been reached.
     try:
-        if unit.location.map_location() == Memory.destinations[unit.id]:
-            Memory.destinations[unit.id] = Constants.DESTINATION_REACHED
+        if unit.location.map_location() == Memory.worker_paths[unit.id]:
+            Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
     except:
         #do nothing - here so that we don't get an error if the destination hasn't been reached
         placeHolder = True
@@ -364,9 +489,9 @@ def WorkerLogic(unit):
                 harvestedLoc = locFromDirect(unit, direct)
                 
                 #if this one is here harvesting, then make sure that other ones go somewhere else
-                for key in Memory.destinations:
-                    if (harvestedLoc.x, harvestedLoc.y) == Memory.destinations[key][-1]:
-                        Memory.destinations[key] = Constants.DESTINATION_REACHED
+                for key in Memory.worker_paths:
+                    if (harvestedLoc.x, harvestedLoc.y) == Memory.worker_paths[key][-1]:
+                        Memory.worker_paths[key] = Constants.DESTINATION_REACHED
                 
                 if unit.location.map_location().planet == bc.Planet.Earth:
                     
@@ -397,7 +522,7 @@ def WorkerLogic(unit):
                     MyVars.factoryLocations.append(bestScoreLoc)
                     return
                 
-        if len(karboniteMapEarth) > 0:
+        if len(karboniteMapEarth) > 4:
             moveWorker(unit)
 
 def karbMultiplier(location):
@@ -428,7 +553,13 @@ def karbMultiplier(location):
         return 0
 
 
-def ranger_logic(unit):
+def ranger_logic(unit):        
+    
+    if unit.id not in Memory.combat_destinations:
+        randNum = random.randint(0,len(Constants.ENEMY_START_POINTS)-1)
+        print("We'll be going towards the " + str(randNum) + " starting point.")
+        Memory.combat_destinations[unit.id] = Constants.ENEMY_START_POINTS[randNum]
+    
     nearby= gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
     for place in nearby:
         if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
@@ -442,12 +573,15 @@ def ranger_logic(unit):
     #        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
     #            gc.move_robot(unit.id, myDirection)
     #            continue
-    myDirection = directions[random.randint(0,7)]
-    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-        gc.move_robot(unit.id, myDirection)
+    moveCombatUnit(unit)
 
         
 def mage_logic(unit):
+    
+    if unit.id not in Memory.combat_destinations:
+        randNum = random.randint(0,len(Constants.ENEMY_START_POINTS)-1)
+        Memory.combat_destinations[unit.id] = Constants.ENEMY_START_POINTS[randNum]
+    
     #same as ranger logic but for the mages
     nearby= gc.sense_nearby_units(location.map_location(), Constants.MAGE_VISION)
     for place in nearby:
@@ -462,9 +596,8 @@ def mage_logic(unit):
     #        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
     #            gc.move_robot(unit.id, myDirection)
     #            continue
-    myDirection = directions[random.randint(0,7)]
-    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-        gc.move_robot(unit.id, myDirection)
+    moveCombatUnit(unit)
+
 
 
 def healer_logic(unit):
@@ -579,7 +712,8 @@ while True:
     print('pyround:', gc.round(), 'time left:', gc.get_time_left_ms(), 'ms')
     # frequent try/catches are a good idea
     try:
-        
+        #print("Combat paths are:")
+        #print(Memory.combat_paths)
         if(gc.round() % 100 == 0):
             print("Current karbonite map is:")
             count = 0
@@ -587,7 +721,8 @@ while True:
                 count+=karboniteMapEarth[key]
             print("There is " + str(count) + " karbonite remaining")
             
-            print(Memory.destinations)
+            print(Memory.worker_paths)
+            print(Memory.combat_paths)
         if gc.round() > 25:
             Constants.HARVEST_AMOUNT = 4
         # walk through our units:
@@ -671,7 +806,8 @@ while True:
 
     print("Nearby Karb took + " + str(totalNearbyKarbTime))
     print("BFS took + " + str(totalBFSTime))    
-    
+    print("Unreachable BFS took + " + str(unreachableTime))    
+
     # send the actions we've performed, and wait for our next turn.
     gc.next_turn()
 
