@@ -26,6 +26,7 @@ class Memory:
     reachable_clusters = []
     combat_paths = {}
     combat_destinations = {}
+    current_vision = {}
     finishedKarb = False
 
 class Constants:
@@ -78,6 +79,7 @@ class MyVars:
     
     factoryLocations = []
     rocketLocations = []
+    
     
 
 print("pystarted")
@@ -136,9 +138,9 @@ def evalFactorySpot(location):
         newLoc = bc.MapLocation(location.planet, location.x + change[0], location.y + change[1])
         if onMap(newLoc):
             if not earthMap.is_passable_terrain_at(newLoc) or newLoc in MyVars.factoryLocations:
-                score-=20
+                score-=30
         else:
-            score-=20
+            score-=30
     return score
     
 
@@ -752,6 +754,57 @@ while True:
     print('pyround:', gc.round(), 'time left:', gc.get_time_left_ms(), 'ms')
     # frequent try/catches are a good idea
     try:
+        #get current relevant information from all our units
+        MyVars.workerCount = 0
+        MyVars.rangerCount = 0
+        MyVars.rocketCount = 0
+        MyVars.factoryCount = 0
+        MyVars.knightCount = 0
+        MyVars.mageCount = 0
+        MyVars.healerCount = 0
+        Memory.current_vision = {}
+        for unit in gc.my_units():
+            
+            visionRange = 0
+            RANGER_VISION = 70
+            WKH_VISION = 50
+            MAGE_VISION = 30
+            
+            if unit.unit_type == bc.UnitType.Worker:
+                MyVars.workerCount += 1
+                visionRange = Constants.WKH_VISION
+            elif unit.unit_type == bc.UnitType.Ranger:
+                MyVars.rangerCount += 1
+                visionRange = Constants.RANGER_VISION
+            elif unit.unit_type == bc.UnitType.Rocket:
+                MyVars.rocketCount += 1
+                visionRange = 2
+            elif unit.unit_type == bc.UnitType.Factory:
+                MyVars.factoryCount += 1
+                visionRange = 2
+            elif unit.unit_type == bc.UnitType.Mage:
+                MyVars.mageCount += 1
+                visionRange = Constants.MAGE_VISION
+            elif unit.unit_type == bc.UnitType.Knight:
+                MyVars.mageCount += 1
+                visionRange = Constants.WKH_VISION
+            elif unit.unit_type == bc.UnitType.Healer:
+                MyVars.mageCount += 1
+                visionRange = Constants.WKH_VISION
+            
+            if unit.location.is_on_map():
+            
+                seen_units = gc.sense_nearby_units(unit.location.map_location(), visionRange)
+                for otherUnit in seen_units:
+                    if otherUnit.team != my_team:
+                        tempLoc = otherUnit.location.map_location()
+                        asTuple = (tempLoc.x, tempLoc.y)
+                        if asTuple not in Memory.current_vision:
+                            Memory.current_vision[asTuple] = otherUnit
+
+        
+        for key in Memory.current_vision:
+            print(Memory.current_vision[key].unit_type)
         #print("Combat paths are:")
         #print(Memory.combat_paths)
         if(gc.round() % 100 == 0):
