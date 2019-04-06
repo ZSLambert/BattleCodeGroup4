@@ -191,9 +191,17 @@ def BFS_firstStep(unit, destination):
         
         
         for adjacent in getNeighbors(bc.MapLocation(planet, node[0], node[1])):
+            taken = False
+            try:
+                if not gc.is_occupiable(adjacent):
+                    thatUnit = gc.sense_nearby_units(adjacent, 1)
+                    if thatUnit.unit_type == bc.UnitType.Factory or thatUnit.unit_type == bc.UnitType.Rocket:
+                        taken = True
+            except:
+                taken = False
             adjLoc = (adjacent.x, adjacent.y)
             
-            if adjLoc not in visited and adjLoc not in queue:
+            if not taken and adjLoc not in visited and adjLoc not in queue:
                 parent[adjLoc] = node # <<<<< record the parent of the node - used to get the path
                 queue.append(adjLoc)
         #current bugFix - hoping to remove in the future - handles cases where we are trying to reach an unreachable destination.
@@ -339,8 +347,8 @@ def moveCombatUnit(unit):
             placeholder = True
             #print("Movement is on cooldown - combat")
         else:
-            placeholder = True
-            #print("Bad direction to move to - combat")
+            #avoidObstacle(unit)
+            print("Bad direction to move to - combat")
             #destination = bc.MapLocation(curPlanet, Constants.ENEMY_START_POINTS[0][0], Constants.ENEMY_START_POINTS[0][1])
             #path = BFS_firstStep(unit, destination)
 
@@ -348,14 +356,21 @@ def moveCombatUnit(unit):
         
 
 def avoidObstacle(unit):
-    print("entered avoidance")
+    
+    myMemory = {}
+    
+    if unit.unit_type == bc.UnitType.Worker:
+        myMemory = Memory.worker_paths
+    else:
+        myMemory = Memory.combat_paths
+    
     global avoidanceTime
     global successCount
     
     startT = int(round(time.time() * 1000))
     
     planet = unit.location.map_location().planet
-    myPath = Memory.worker_paths[unit.id]
+    myPath = myMemory[unit.id]
     obstacle = myPath[0]
     dest = myPath[0]
     for i in range(1, len(myPath)):
@@ -378,7 +393,7 @@ def avoidObstacle(unit):
     while queue:
         if int(round(time.time()*1000)) - startT > 4.5:
             print("Avoidance timed out")
-            Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
+            myMemory[unit.id] = Constants.DESTINATION_REACHED
             avoidanceTime += int(round(time.time() * 1000) - startT)
             return
             
@@ -420,7 +435,7 @@ def avoidObstacle(unit):
         if movedLoc in path:
             print("Shortening path!")
             indexOf = path.index(movedLoc)
-            Memory.worker_paths[unit.id] = path[indexOf+1:]
+            myMemory[unit.id] = path[indexOf+1:]
     
             
     
@@ -464,8 +479,8 @@ def moveWorker(unit):
             #print("Movement is on cooldown - worker")
         else:
             
-            #print("Bad direction to move to - worker")
-            avoidObstacle(unit)
+            print("Bad direction to move to - worker")
+            #avoidObstacle(unit)
 
 
 def WorkerLogic(unit):
@@ -547,6 +562,8 @@ def WorkerLogic(unit):
                 
         if len(karboniteMapEarth) > 4:
             moveWorker(unit)
+        else:
+            gc.disintegrate_unit(unit.id)
 
 def karbMultiplier(location):
     minDistEnemy = 1000000
