@@ -58,11 +58,12 @@ class Constants:
     HEALER_VISION = 50
     HEALER_RANGE = 30
     RANGER_RANGE = 50
-    MH_RANGE = 30
+    MAGE_RANGE = 30
     KNIGHT_RANGE = 2
     INITIAL_KARB_COUNT = 0
     START_POINTS = []
     ENEMY_START_POINTS = []
+    DANGEROUS_ENEMIES = [bc.UnitType.Ranger, bc.UnitType.Mage, bc.UnitType.Knight]
 
 
 class MyVars:
@@ -349,98 +350,13 @@ def moveCombatUnit(unit):
             placeholder = True
             #print("Movement is on cooldown - combat")
         else:
+            placeholder = True
             #avoidObstacle(unit)
-            print("Bad direction to move to - combat")
+            #print("Bad direction to move to - combat")
             #destination = bc.MapLocation(curPlanet, Constants.ENEMY_START_POINTS[0][0], Constants.ENEMY_START_POINTS[0][1])
             #path = BFS_firstStep(unit, destination)
 
-            #Memory.combat_paths[unit.id] = path
-        
-
-def avoidObstacle(unit):
-    
-    myMemory = {}
-    
-    if unit.unit_type == bc.UnitType.Worker:
-        myMemory = Memory.worker_paths
-    else:
-        myMemory = Memory.combat_paths
-    
-    global avoidanceTime
-    global successCount
-    
-    startT = int(round(time.time() * 1000))
-    
-    planet = unit.location.map_location().planet
-    myPath = myMemory[unit.id]
-    obstacle = myPath[0]
-    dest = myPath[0]
-    for i in range(1, len(myPath)):
-        try:
-            if gc.is_occupiable(bc.MapLocation(planet, myPath[i][0], myPath[i][1])):
-                dest = myPath[i]
-                ##exit the loop
-                i = len(myPath) + 1
-        except:
-            return
-            #print(i)
-            #print("This is so blocked off we can't find a free spot to go to in the path")
-            
-                  
-    finalPath = []
-    orig = unit.location.map_location().x, unit.location.map_location().y
-    visited = []
-    parent = {}
-    queue = [orig]
-    while queue:
-        if int(round(time.time()*1000)) - startT > 4.5:
-            print("Avoidance timed out")
-            myMemory[unit.id] = Constants.DESTINATION_REACHED
-            avoidanceTime += int(round(time.time() * 1000) - startT)
-            return
-            
-        node = queue.pop(0)
-        visited.append(node)
-        if node == dest:
-            #starts a list which will track the entire path from the end to the exit
-            #ends up reversing it and returning the location of the first step
-            path = [dest]
-            while path[-1] != orig:
-                path.append(parent[path[-1]])
-            path.reverse()
-            if len(path) == 1:
-                print("Destination was the start point - avoidance")
-                return
-            finalPath = path[1:]
-        
-        neighbors = getNeighbors(bc.MapLocation(planet, node[0], node[1]))
-        
-        
-        for adjacent in getNeighbors(bc.MapLocation(planet, node[0], node[1])):
-            try:
-                if gc.is_occupiable(adjacent):
-
-                    adjLoc = (adjacent.x, adjacent.y)
-
-                    if adjLoc not in visited and adjLoc not in queue:
-                        parent[adjLoc] = node # <<<<< record the parent of the node - used to get the path
-                        queue.append(adjLoc)
-            except:
-                placeHolder = True
-                #print(adjacent)
-                #print("That was an out of bounds neighbor")
-    avoidanceTime += int(round(time.time() * 1000) - startT)
-    if len(finalPath) > 0:
-        successCount += 1
-        gc.move_robot(unit.id, unit.location.map_location().direction_to(bc.MapLocation(planet, finalPath[0][0], finalPath[0][1])))
-        movedLoc = unit.location.map_location().x, unit.location.map_location().y
-        if movedLoc in path:
-            print("Shortening path!")
-            indexOf = path.index(movedLoc)
-            myMemory[unit.id] = path[indexOf+1:]
-    
-            
-    
+            #Memory.combat_paths[unit.id] = path 
     
 def moveWorker(unit):
     
@@ -484,6 +400,90 @@ def moveWorker(unit):
             print("Bad direction to move to - worker")
             #avoidObstacle(unit)
 
+            
+def getAttackRange(unit):
+    if unit.unit_type == bc.UnitType.Ranger:
+        return Constants.RANGER_RANGE
+    elif unit.unit_type == bc.UnitType.Mage:
+        return Constants.MAGE_RANGE
+    elif unit.unit_type == bc.UnitType.Knight:
+        return Constants.KNIGHT_RANGE
+    else:
+        return 0
+            
+def inDanger(unit):
+    
+    ourLoc = unit.location.map_location()
+    
+    for key in Memory.current_vision:
+        enemyUnit = Memory.current_vision[key]
+        enemyLoc = enemyUnit.location.map_location()
+        enemyRange = getAttackRange(enemyUnit)
+        distTo = pow(enemyLoc.x - ourLoc.x, 2) + pow(enemyLoc.y - ourLoc.y, 2)
+        if distTo <= enemyRange:
+            return True
+    return False
+        
+        
+    
+def tryToMoveToSafety(unit):
+    toCheck = getNeighbors(unit.location.map_location())
+    toCheck.append(unit.location.map_location())
+    ourLoc = unit.location.map_location()
+
+    damageDict = {}
+    #initialize dictionary
+    for spot in toCheck:
+        damageDict[(spot.x,spot.y)] = 0
+
+    
+    for key in Memory.current_vision:
+        enemyUnit = Memory.current_vision[key]
+        enemyType = enemyUnit.unit_type
+        if enemyType in Constants.DANGEROUS_ENEMIES:
+            enemyRange = getAttackRange(enemyUnit)
+            enemyLoc = enemyUnit.location.map_location()
+            if pow(ourLoc.x - enemyLoc.x,2) + pow(ourLoc.y - enemyLoc.y,2) < 55:
+                for spot in toCheck:
+                    distTo = pow(spot.x - enemyLoc.x,2) + pow(spot.y - enemyLoc.y,2)
+                    if distTo <= enemyRange:
+                        damageDict[(spot.x,spot.y)] += enemyUnit.damage()
+    #damageDict will now list the damage we will take at any one of these spots
+    
+    
+    minDamage = 10000
+    bestSpots = []
+    for spot in toCheck:
+        if damageDict[(spot.x,spot.y)] < minDamage:
+            minDamage = damageDict[spot.x,spot.y]
+            bestSpots = [spot]
+        elif damageDict[spot.x,spot.y] == minDamage:
+            bestSpots.append(spot)
+    
+    print("Min damage is " + str(minDamage))
+    
+    if minDamage > unit.health:
+        print(str(minDamage) + " is > " + str(unit.health))
+        #this means we die no matter where we move, so we might as well not try to.
+        return False
+    else:
+        randNum = 0
+        if len(bestSpots) > 1:
+            randNum = random.randint(0, len(bestSpots)-1)
+        
+        chosenSpot = bestSpots[randNum]
+        myDirection = unit.location.map_location().direction_to(chosenSpot)
+        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+            gc.move_robot(unit.id, myDirection)
+            if unit.unit_type == bc.UnitType.Worker:
+                Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
+            else:
+                Memory.combat_paths[unit.id] = Constants.DESTINATION_REACHED
+            return True
+        print("Couldn't move that direction")
+        return False
+        
+        
 
 def WorkerLogic(unit):
     ##priorities should be:
@@ -494,13 +494,19 @@ def WorkerLogic(unit):
     
     #code to escape from enemies close
     
+    if inDanger(unit):
+        print("I'm in danger!")
+        successful = tryToMoveToSafety(unit)
+        if successful:
+            print("Succesfully moved out of danger!")
+            return
     #if we have reached our destination, change this units destination to a placeholder representing
     #that it has been reached.
     try:
         if unit.location.map_location() == Memory.worker_paths[unit.id]:
             Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
     except:
-        #do nothing - here so that we don't get an error if the destination hasn't been reached
+        #do nothing - here so that we don't get an error if we haven't calculated a path yet
         placeHolder = True
     
     #if we don't have enough workers, 
@@ -602,6 +608,13 @@ def ranger_logic(unit):
         #print("We'll be going towards the " + str(randNum) + " starting point.")
         Memory.combat_destinations[unit.id] = Constants.ENEMY_START_POINTS[randNum]
     
+    if inDanger(unit):
+        print("I'm in danger!")
+        successful = tryToMoveToSafety(unit)
+        if successful:
+            print("Succesfully moved out of danger!")
+            return
+    
     nearby= gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
     for place in nearby:
         if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
@@ -624,6 +637,12 @@ def mage_logic(unit):
         randNum = random.randint(0,len(Constants.ENEMY_START_POINTS)-1)
         Memory.combat_destinations[unit.id] = Constants.ENEMY_START_POINTS[randNum]
     
+    
+    if inDanger(unit):
+        print("I'm in danger!")
+        successful = tryToMoveToSafety(unit)
+        if successful:
+            print("Succesfully moved out of danger!")
     #same as ranger logic but for the mages
     nearby= gc.sense_nearby_units(location.map_location(), Constants.MAGE_VISION)
     for place in nearby:
@@ -644,6 +663,13 @@ def mage_logic(unit):
 
 def healer_logic(unit):
     #same as ranger logic but for the Healer. the healer attacks our teams units to heal them.
+    
+    if inDanger(unit):
+        print("I'm in danger!")
+        successful = tryToMoveToSafety(unit)
+        if successful:
+            print("Succesfully moved out of danger!")
+    
     nearby= gc.sense_nearby_units(location.map_location(), Constants.HEALER_VISION)
     for place in nearby:
         if place.team == my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
@@ -803,8 +829,7 @@ while True:
                             Memory.current_vision[asTuple] = otherUnit
 
         
-        for key in Memory.current_vision:
-            print(Memory.current_vision[key].unit_type)
+        #print(Memory.current_vision)
         #print("Combat paths are:")
         #print(Memory.combat_paths)
         if(gc.round() % 100 == 0):
@@ -900,8 +925,8 @@ while True:
     print("Nearby Karb took + " + str(totalNearbyKarbTime))
     print("BFS took + " + str(totalBFSTime))    
     print("Unreachable BFS took + " + str(unreachableTime))    
-    print("Avoidance took + " + str(avoidanceTime))    
-    print(str(successCount) + " successful avoidances of obstacles.")
+    #print("Avoidance took + " + str(avoidanceTime))    
+    #print(str(successCount) + " successful avoidances of obstacles.")
 
     # send the actions we've performed, and wait for our next turn.
     gc.next_turn()
