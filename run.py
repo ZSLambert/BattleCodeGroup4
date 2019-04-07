@@ -38,6 +38,7 @@ class Constants:
     LAUNCH_BY = 749
     DESIRED_WORKERS = 10
     DESIRED_FACTORIES = 4
+    HEALER_MAX_WEIGHT= 25
     DESIRED_ROCKETS = 4
     DIRECTION_CHANGES = [(0,1),(0,-1),(1,0),(-1,0),(1,1),(-1,-1),(1,-1),(-1,1)]
     REPLICATE_COST = 60
@@ -81,9 +82,9 @@ class MyVars:
     knightCount = 0
     mageCount = 0
     healerCount = 0
-    rangerWeight = 0
-    mageWeight = 0
-    healerWeight = 10
+    rangerWeight = 10
+    mageWeight = 10
+    healerWeight = 0
     
     marsWorkerCount = 0
     marsRangerCount = 0
@@ -312,7 +313,7 @@ def locFromDirect(unit, direction):
 
 
 def moveMarsUnit(unit):
-    print("Moving Mars troop")
+    #print("Moving Mars troop")
     curPlanet = unit.location.map_location().planet
 
     # print("Destination for me is " + str(Memory.rocket_destination[unit.id]))
@@ -335,7 +336,11 @@ def moveMarsUnit(unit):
         path = Memory.marsTroop_paths[unit.id]
         # if we already reached that destination: get a new one
         if path == Constants.DESTINATION_REACHED:
-            placeholder = True
+            for i in np.random.permutation(8):
+                myDirection = directions[i]
+                if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                    gc.move_robot(unit.id, myDirection)
+                    return 
     except:
         # this will only happen the first time a destination is generated for a spot
         path = BFS_firstStep(unit, destination)
@@ -387,11 +392,12 @@ def moveCombatUnit(unit):
         path = Memory.combat_paths[unit.id]
         #if we already reached that destination: get a new one
         if path == Constants.DESTINATION_REACHED:
-            for i in np.random.permutation(8):
-                myDirection = directions[i]
-                if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                    gc.move_robot(unit.id, myDirection)
-                    return 
+            if gc.is_move_ready(unit.id):
+                for i in np.random.permutation(8):
+                    myDirection = directions[i]
+                    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                        gc.move_robot(unit.id, myDirection)
+                        return 
         
     except:
         #this will only happen the first time a destination is generated for a spot
@@ -581,7 +587,7 @@ def WorkerLogic(unit):
     #code to escape from enemies close
     
     if inDanger(unit):
-        print("I'm in danger!")
+        #print("I'm in danger!")
         successful = tryToMoveToSafety(unit)
         if successful:
             print("Succesfully moved out of danger!")
@@ -784,7 +790,7 @@ def ranger_logic(unit):
     if unit.id in Memory.marsTroops and unit.location.map_location().planet == bc.Planet.Earth and MyVars.rocketCount > 0:
         if unit.id not in Memory.rocket_destination:
             rocketFound = False
-            nearby = gc.sense_nearby_units(location.map_location(), Constants.HEALER_VISION)
+            nearby = gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
             for place in nearby:
                 # print(place)
                 if place.team == my_team and place.unit_type == bc.UnitType.Rocket:
@@ -804,24 +810,23 @@ def ranger_logic(unit):
         Memory.combat_destinations[unit.id] = Constants.ENEMY_START_POINTS[randNum]
     
     if inDanger(unit):
-        print("I'm in danger!")
+        #print("I'm in danger!")
         successful = tryToMoveToSafety(unit)
         if successful:
-            print("Succesfully moved out of danger!")
+            #print("Succesfully moved out of danger!")
+            return
     
     nearby= gc.sense_nearby_units(location.map_location(), Constants.RANGER_VISION)
     for place in nearby:
         if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-            #print("Ranger attacked a unit!")
             gc.attack(unit.id, place.id)
             return
-    #commented out since this is broken right now
-    #for place in nearby:
-    #    if place.team != my_team and not gc.can_attack(unit.id, place.id):
-    #        myDirection = BFS_firstStep(unit, place.location.map_location())[-1]
-    #        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-    #            gc.move_robot(unit.id, myDirection)
-    #            continue
+        elif place.team != my_team:
+            enemydirection = unit.location.map_location().direction_to(place.location.map_location())
+            if gc.can_move(unit.id, enemydirection) and gc.is_move_ready(unit.id):
+                gc.move_robot(unit.id, enemydirection)
+                return
+
     moveCombatUnit(unit)
 
         
@@ -830,7 +835,7 @@ def mage_logic(unit):
     if unit.id in Memory.marsTroops and unit.location.map_location().planet == bc.Planet.Earth and MyVars.rocketCount > 0:
         if unit.id not in Memory.rocket_destination:
             rocketFound = False
-            nearby = gc.sense_nearby_units(location.map_location(), Constants.HEALER_VISION)
+            nearby = gc.sense_nearby_units(location.map_location(), Constants.MAGE_VISION)
             for place in nearby:
                 # print(place)
                 if place.team == my_team and place.unit_type == bc.UnitType.Rocket:
@@ -851,24 +856,24 @@ def mage_logic(unit):
     
     
     if inDanger(unit):
-        print("I'm in danger!")
+        #print("I'm in danger!")
         successful = tryToMoveToSafety(unit)
         if successful:
-            print("Succesfully moved out of danger!")
-    #same as ranger logic but for the mages
+            #print("Succesfully moved out of danger!")
+            return
+
     nearby= gc.sense_nearby_units(location.map_location(), Constants.MAGE_VISION)
     for place in nearby:
         if place.team != my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
             #print("Mage attacked a unit!")
             gc.attack(unit.id, place.id)
-            continue
-    #commented out since this is broken right now
-    #for place in nearby:
-    #    if place.team != my_team and not gc.can_attack(unit.id, place.id):
-    #        myDirection = BFS_firstStep(unit, place.location.map_location())[-1]
-    #        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-    #            gc.move_robot(unit.id, myDirection)
-    #            continue
+            return
+        elif place.team != my_team:
+            enemydirection = unit.location.map_location().direction_to(place.location.map_location())
+            if gc.can_move(unit.id, enemydirection) and gc.is_move_ready(unit.id):
+                gc.move_robot(unit.id, enemydirection)
+                return
+
     moveCombatUnit(unit)
 
 
@@ -898,24 +903,24 @@ def healer_logic(unit):
         print("I'm in danger!")
         successful = tryToMoveToSafety(unit)
         if successful:
-            print("Succesfully moved out of danger!")
+            #print("Succesfully moved out of danger!")
+            return
     
     nearby= gc.sense_nearby_units(location.map_location(), Constants.HEALER_VISION)
     for place in nearby:
         if place.team == my_team and gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, place.id):
-            #print("Healed a unit!")
             gc.attack(unit.id, place.id)
-            continue
-    #commented out since this is broken right now
-    #for place in nearby:
-    #    if place.team != my_team and not gc.can_attack(unit.id, place.id):
-    #        myDirection = BFS_firstStep(unit, place.location.map_location())[-1]
-    #        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-    #            gc.move_robot(unit.id, myDirection)
-    #            continue
+            return
+        elif place.team == my_team:
+            unitdirection = unit.location.map_location().direction_to(place.location.map_location())
+            if gc.can_move(unit.id, unitdirection) and gc.is_move_ready(unit.id):
+                gc.move_robot(unit.id, unitdirection)
+                return
+
     myDirection = directions[random.randint(0,7)]
     if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-        gc.move_robot(unit.id, myDirection)       
+        gc.move_robot(unit.id, myDirection)
+        return
 
 def factory_logic(unit):
     garrison = unit.structure_garrison()
@@ -1035,6 +1040,8 @@ while True:
     print('pyround:', gc.round(), 'time left:', gc.get_time_left_ms(), 'ms')
     # frequent try/catches are a good idea
     try:
+        if(gc.round() % 25== 0) and MyVars.healerWeight < Constants.HEALER_MAX_WEIGHT:
+            MyVars.healerWeight += 2
         #get current relevant information from all our units
         MyVars.workerCount = 0
         MyVars.rangerCount = 0
