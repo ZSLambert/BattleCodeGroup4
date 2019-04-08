@@ -463,6 +463,7 @@ def moveWorker(unit):
     try:
         #get the destination that this unit is supposed to be going to
         path = Memory.worker_paths[unit.id]
+        #print("My path is " + str(path))
         #if we already reached that destination: get a new one
         if path == Constants.DESTINATION_REACHED:
             destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
@@ -479,7 +480,8 @@ def moveWorker(unit):
     #move in the correct direction to get to our destination if possible.
 
     nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
-
+    
+    
 
     myDirection = unit.location.map_location().direction_to(nextStep)
 
@@ -488,6 +490,9 @@ def moveWorker(unit):
         #remove the first step of the path that we had.
 
         Memory.worker_paths[unit.id] = path[1:]
+        
+        #print("Now that I moved, my path is " + str(Memory.worker_paths[unit.id]))
+        
         if (Memory.worker_paths[unit.id] == []):
             Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
         return
@@ -656,13 +661,13 @@ def WorkerLogic(unit):
     #if we have reached our destination, change this units destination to a placeholder representing
     #that it has been reached.
     try:
-        if unit.location.map_location() == Memory.worker_paths[unit.id]:
+        if (unit.location.map_location().x,unit.location.map_location().y) == Memory.worker_paths[unit.id][-1]:
             Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
     except:
         #do nothing - here so that we don't get an error if we haven't calculated a path yet
         destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
         path = BFS_firstStep(unit, destination)
-        Memory.worker_paths[unit.id] = path    
+        Memory.worker_paths[unit.id] = path  
     #if we don't have enough workers, 
     if MyVars.workerCount < Constants.DESIRED_WORKERS and gc.karbonite() >= Constants.REPLICATE_COST:
         direct = getNeighbors(unit.location.map_location())
@@ -746,7 +751,10 @@ def WorkerLogic(unit):
                     if unit.location.map_location().planet == bc.Planet.Earth:
 
                         if (gc.karbonite_at(harvestedLoc) < 1):
-                            del karboniteMapEarth[(harvestedLoc.x,harvestedLoc.y)]
+                            try:
+                                del karboniteMapEarth[(harvestedLoc.x,harvestedLoc.y)]
+                            except:
+                                placeHolder = True
                         else:
                             karboniteMapEarth[(harvestedLoc.x,harvestedLoc.y)] = gc.karbonite_at(harvestedLoc)
                         #print("After harvesting there is now " + str(karboniteMapEarth[harvestedLoc.x][harvestedLoc.y]))
@@ -778,22 +786,8 @@ def karbMultiplier(location):
         if tempDist < minDistFriendly:
             minDistFriendly = tempDist
     
-    avgEarthDist = (earthWidth + earthHeight) /2
-    
-    #print("Earth dist is " + str(avgEarthDist))
-    
-    if avgEarthDist > 43:
-        if minDistFriendly >= avgEarthDist / 5:
-            return 0
-    elif avgEarthDist > 30:
-        if minDistFriendly >= avgEarthDist / 3:
-            return 0
-    elif avgEarthDist > 27:
-        if minDistFriendly >= avgEarthDist /2.5:
-            return 0
-    else:
-        if minDistFriendly >= avgEarthDist/1.75:
-            return 0
+    if minDistFriendly > 30:
+        return 0
     
     reachable = False
     for cluster in Memory.reachable_clusters:
@@ -825,6 +819,12 @@ def rocket_logic(unit):
             gc.launch_rocket(unit.id, destination)
             MyVars.rocketLocations.remove(unit.location.map_location)
             MyVars.rocketCount -= 1
+        elif gc.round() > 740:
+            if gc.can_launch_rocket(unit.id, destination):
+                gc.launch_rocket(unit.id, destination)
+                MyVars.rocketLocations.remove(unit.location.map_location)
+                MyVars.rocketCount -= 1
+                print("Performed a panic rocket launch - flood coming")
     elif unit.location.map_location().planet == bc.Planet.Mars:
         if len(garrison) > 0:
             d = random.choice(directions)
@@ -877,7 +877,11 @@ def ranger_logic(unit):
             Memory.combat_paths[unit.id] = Constants.DESTINATION_REACHED
     
     elif Constants.ENEMIES_UNREACHABLE:
+        Memory.combat_destinations[unit.id] = (100,100)
         Memory.combat_paths[unit.id] = Constants.DESTINATION_REACHED
+    else:
+        Memory.combat_destinations[unit.id] = (100,100)
+
     
     if inDanger(unit):
         #print("I'm in danger!")
@@ -993,7 +997,10 @@ def mage_logic(unit):
             Memory.combat_paths[unit.id] = Constants.DESTINATION_REACHED
     
     elif Constants.ENEMIES_UNREACHABLE:
+        Memory.combat_destinations[unit.id] = (100,100)
         Memory.combat_paths[unit.id] = Constants.DESTINATION_REACHED
+    else:
+        Memory.combat_destinations[unit.id] = (100,100)
     
     if inDanger(unit):
         #print("I'm in danger!")
@@ -1273,6 +1280,7 @@ while True:
     print('pyround:', gc.round(), 'time left:', gc.get_time_left_ms(), 'ms')
     # frequent try/catches are a good idea
     try:
+        
         if(gc.round() % 25== 0) and MyVars.healerWeight < Constants.HEALER_MAX_WEIGHT:
             MyVars.healerWeight += 2
         #get current relevant information from all our units
