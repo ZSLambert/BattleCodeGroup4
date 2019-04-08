@@ -86,6 +86,8 @@ class MyVars:
     knightCount = 0
     mageCount = 0
     healerCount = 0
+    
+    #used for ranger,mage and healer production, more weight means more will be produced
     rangerWeight = 10
     mageWeight = 10
     healerWeight = 0
@@ -95,6 +97,7 @@ class MyVars:
     marsMageCount = 0
     marsHealerCount = 0
 
+    #stores factory and rocket locations
     factoryLocations = []
     rocketLocations = []
 
@@ -410,7 +413,7 @@ def moveCombatUnit(unit):
         path = Memory.combat_paths[unit.id]
         # if we already reached that destination: get a new one
         if path == Constants.DESTINATION_REACHED:
-            if gc.is_move_ready(unit.id):
+        #if it reached its initial destination, use random movement
                 for i in np.random.permutation(8):
                     myDirection = directions[i]
                     if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
@@ -431,7 +434,6 @@ def moveCombatUnit(unit):
     nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
 
     myDirection = unit.location.map_location().direction_to(nextStep)
-
     if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
         gc.move_robot(unit.id, myDirection)
         # remove the first step of the path that we had.
@@ -1093,6 +1095,7 @@ def ranger_logic(unit):
                 tooCloseEnemies.append(place)
 
     if killableEnemy != unit:
+        # if the unit can attack the enemy and is ready to attack then attack the enemy
         if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, killableEnemy.id):
             gc.attack(unit.id, killableEnemy.id)
 
@@ -1104,11 +1107,13 @@ def ranger_logic(unit):
             if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, nonAggressiveUnits[0].id):
                 gc.attack(unit.id, nonAggressiveUnits[0].id)
         else:
+        #choose a non-aggressive unit to attack and try to attack it
             choice = random.randint(0, len(nonAggressiveUnits) - 1)
             chosenEnemy = nonAggressiveUnits[choice]
             if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, chosenEnemy.id):
                 gc.attack(unit.id, chosenEnemy.id)
     elif len(tooCloseEnemies) > 0:
+        #move away from enemys that are too close for comfort
         for i in np.random.permutation(len(tooCloseEnemies)):
 
             chosenEnemy = tooCloseEnemies[i]
@@ -1127,7 +1132,7 @@ def ranger_logic(unit):
                 if not dangerousSpot(potentialSpot) and gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
                     gc.move_robot(unit.id, myDirection)
                     return
-
+        #if none of the other stuff happens, then move on to the move combat unit function
         moveCombatUnit(unit)
 
 
@@ -1214,13 +1219,16 @@ def mage_logic(unit):
                 nonAggressiveUnits.append(place)
 
     if killableEnemy != unit:
+         # if the unit can attack the enemy and it will die and is ready to attack then attack the enemy
         if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, killableEnemy.id):
             gc.attack(unit.id, killableEnemy.id)
 
     elif mostDangerousEnemy != unit:
+         # if the unit can attack the enemy and is ready to attack then attack the enemy
         if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, mostDangerousEnemy.id):
             gc.attack(unit.id, mostDangerousEnemy.id)
     elif len(nonAggressiveUnits) > 0:
+        #choose a non-aggressive unit to attack and try to attack it
         if len(nonAggressiveUnits) == 1:
             if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, nonAggressiveUnits[0].id):
                 gc.attack(unit.id, nonAggressiveUnits[0].id)
@@ -1240,7 +1248,7 @@ def mage_logic(unit):
                 if not dangerousSpot(potentialSpot) and gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
                     gc.move_robot(unit.id, myDirection)
                     return
-
+        #if none of the other stuff happens, then move on to the move combat unit function
         moveCombatUnit(unit)
 
 
@@ -1311,6 +1319,9 @@ def factory_logic(unit):
         if gc.can_unload(unit.id, d):
             gc.unload(unit.id, d)
             return
+    #the production of units is determined by the weight of the unit. a random number is selected from 0 to the combined weight of the units.
+    #the number determins which kind of unit will be produced. The higher the weight of the unit, the greater chance it will be produced.
+    # healer weight is increased until it reaches its max weight so that more healers are produced later in the game than at the begining
     elif gc.can_produce_robot(unit.id, bc.UnitType.Ranger):
         toproduce = random.randint(0, (MyVars.mageWeight + MyVars.rangerWeight + MyVars.healerWeight))
         if toproduce <= MyVars.rangerWeight:
@@ -1383,14 +1394,12 @@ for point in Constants.START_POINTS:
 # add in numbers/booleans for where karbonite/passable terrain is.
 for i in range(earthWidth):
     for j in range(earthHeight):
-        # print("Working with point " + str(i) + "," + str(j))
         loc = bc.MapLocation(bc.Planet.Earth, i, j)
         karbCount = int(earthMap.initial_karbonite_at(loc)) * karbMultiplier(loc)
         if (karbCount > 0):
             totalCount += karbCount
             karboniteMapEarth[(i, j)] = int(earthMap.initial_karbonite_at(loc))
         passableMapEarth[i][j] = earthMap.is_passable_terrain_at(loc)
-        # print(str(i) + "," + str(j) + " is passable is " + str(earthMap.is_passable_terrain_at(loc)))
 
 print(karboniteMapEarth)
 
@@ -1409,7 +1418,6 @@ for i in range(marsWidth):
 
 # now, on earth, try to scale the amount of karbonite so that places close to the enemy aren't listed as
 # having any.  Also, remove any places that are unreachable by our people.
-
 Constants.INITIAL_KARB_COUNT = totalCount
 
 minSize = 10000
@@ -1451,6 +1459,7 @@ while True:
     print('pyround:', gc.round(), 'time left:', gc.get_time_left_ms(), 'ms')
     # frequent try/catches are a good idea
     try:
+        #increment healer weight by 2 every 25 rounds until it reaches the max weight for healers
         if (gc.round() % 25 == 0) and MyVars.healerWeight < Constants.HEALER_MAX_WEIGHT:
             MyVars.healerWeight += 2
         # get current relevant information from all our units
