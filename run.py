@@ -521,103 +521,17 @@ def MarsWorkerLogic(unit):
             # print("Succesfully moved out of danger!")
             return
 
+    for i in np.random.permutation(8):
+        myDirection = directions[i]
+        if gc.can_harvest(unit.id, myDirection):
+            print("in if for if line 556")
+            gc.harvest(unit.id, myDirection)
+            harvestedLoc = locFromDirect(unit, myDirection)
 
-    try:
-        print("In try line 526")
-        if (unit.location.map_location().x, unit.location.map_location().y) == Memory.worker_paths[unit.id][-1]:
-            Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
-    except:
-        print("in except line 530")
-        # do nothing - here so that we don't get an error if we haven't calculated a path yet
-        destination = nearbyKarb(unit.location.map_location(), bc.Planet.Mars)
-        path = BFS_firstStep(unit, destination)
-        Memory.worker_paths[unit.id] = path
-        # if we don't have enough workers,
-        # get locations which are passable nearby
-        validLocs = getNeighbors(unit.location.map_location())
-
-        # if we're close enough to our destination, harvest any karbonite that is near us
-        distToDest = 0
-        try:
-            print("in try line 542")
-            if Memory.worker_paths[unit.id] == Constants.DESTINATION_REACHED:
-                distToDest = 0
-            else:
-                tempDest = Memory.worker_paths[unit.id][-1]
-                distToDest = pow(tempDest[0] - unit.location.map_location().x, 2) + pow(
-                    tempDest[1] - unit.location.map_location().y, 2)
-        except:
-            print("in except line 550")
-            distToDest = 0
-        if distToDest < 5:
-            print("in if line 553")
-            for direct in directions:
-                if gc.can_harvest(unit.id, direct):
-                    print("in if for if line 556")
-                    gc.harvest(unit.id, direct)
-                    harvestedLoc = locFromDirect(unit, direct)
-
-                    # if this one is here harvesting, then make sure that other ones go somewhere else
-                    for key in Memory.worker_paths:
-                        if (harvestedLoc.x, harvestedLoc.y) == Memory.worker_paths[key][-1]:
-                            Memory.worker_paths[key] = Constants.DESTINATION_REACHED
-
-                    if (gc.karbonite_at(harvestedLoc) < 1):
-                        try:
-                            del karboniteMapMars[(harvestedLoc.x, harvestedLoc.y)]
-                        except:
-                            placeHolder = True
-                    else:
-                        karboniteMapMars[(harvestedLoc.x, harvestedLoc.y)] = gc.karbonite_at(harvestedLoc)
-
-        if len(karboniteMapMars) > 0:
-            print("in important karb if line 574")
-            try:
-                # get the destination that this unit is supposed to be going to
-                path = Memory.worker_paths[unit.id]
-                # if we already reached that destination: get a new one
-                if path == Constants.DESTINATION_REACHED:
-                    destination = nearbyKarb(unit.location.map_location(), bc.Planet.Mars)
-                    path = BFS_firstStep(unit, destination)
-                    Memory.worker_paths[unit.id] = path
-            except:
-                # this will only happen the first time a destination is generated for a spot
-                destination = nearbyKarb(unit.location.map_location(), bc.Planet.Mars)
-
-                path = BFS_firstStep(unit, destination)
-
-                Memory.worker_paths[unit.id] = path
-
-            # move in the correct direction to get to our destination if possible.
-
-            nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
-
-            myDirection = unit.location.map_location().direction_to(nextStep)
-
-            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                gc.move_robot(unit.id, myDirection)
-                # remove the first step of the path that we had.
-
-                Memory.worker_paths[unit.id] = path[1:]
-                if (Memory.worker_paths[unit.id] == []):
-                    Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
-                return
-            else:
-                if not gc.is_move_ready(unit.id):
-                    placeholder = True
-                    # print("Movement is on cooldown - worker")
-                else:
-
-                    print("Bad direction to move to - worker")
-                    # avoidObstacle(unit)
-
-        else:
-            print("in else line 615")
-            for i in np.random.permutation(8):
-                myDirection = directions[i]
-                if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                    gc.move_robot(unit.id, myDirection)
-                    return
+            karboniteMapMars[(harvestedLoc.x, harvestedLoc.y)] = gc.karbonite_at(harvestedLoc)
+        elif gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+            gc.move_robot(unit.id, myDirection)
+            return
 
 
 def MarsHealerLogic(unit):
@@ -735,13 +649,6 @@ def MarsCombatLogic(unit):
 
         destination = bc.MapLocation(curPlanet, Memory.combat_destinations[unit.id][0],
                                      Memory.combat_destinations[unit.id][1])
-        try:
-
-            if not marsMap.is_passable_terrain_at(destination):
-                return
-        except:
-            placeholder = True
-            # print(str(destination) + " was not on the map")
 
         try:
             # get the destination that this unit is supposed to be going to
@@ -759,14 +666,18 @@ def MarsCombatLogic(unit):
             # this will only happen the first time a destination is generated for a spot
             path = BFS_firstStep(unit, destination)
 
-            # they only travel half way to the enemy start point
-            n = math.floor(len(path) / 2)
-            del path[-n:]
 
             Memory.combat_paths[unit.id] = path
 
         # move in the correct direction to get to our destination if possible.
-        nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
+        try:
+            nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
+        except:
+            for i in np.random.permutation(8):
+                myDirection = directions[i]
+                if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                    gc.move_robot(unit.id, myDirection)
+                    return
 
         myDirection = unit.location.map_location().direction_to(nextStep)
 
@@ -1118,12 +1029,17 @@ def rocket_logic(unit):
     garrison = unit.structure_garrison()
     if unit.location.map_location().planet == bc.Planet.Earth:
         destination = getRocketDestination(unit)
-        if inDanger(unit) and len(garrison) > 0:
-            if gc.can_launch_rocket(unit.id, destination):
-                gc.launch_rocket(unit.id, destination)
-                MyVars.rocketLocations.remove(unit.location.map_location)
-                MyVars.rocketCount -= 1
-                print("Performed a panic rocket launch")
+        if inDanger(unit):
+            if len(garrison) > 0:
+                if gc.can_launch_rocket(unit.id, destination):
+                    gc.launch_rocket(unit.id, destination)
+                    MyVars.rocketLocations.remove(unit.location.map_location)
+                    MyVars.rocketCount -= 1
+                    print("Performed a panic rocket launch")
+                else:
+                    gc.disintegrate_unit(unit.id)
+                    MyVars.rocketLocations.remove(unit.location.map_location)
+                    MyVars.rocketCount -= 1
         elif len(garrison) < 8:
             nearby = gc.sense_nearby_units(location.map_location(), Constants.ROCKET_VISION)
             for place in nearby:
@@ -1665,6 +1581,11 @@ while True:
                 visionRange = Constants.WKH_VISION
 
             if unit.location.is_on_map():
+
+                if unit.location.map_location().planet == bc.Planet.Mars and gc.karbonite_at(unit.location.map_location()) > 0:
+                    karboniteMapMars[
+                        (unit.location.map_location().x, unit.location.map_location().y)] = gc.karbonite_at(
+                        unit.location.map_location())
 
                 seen_units = gc.sense_nearby_units(unit.location.map_location(), visionRange)
                 for otherUnit in seen_units:
