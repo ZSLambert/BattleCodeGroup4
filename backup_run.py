@@ -300,22 +300,9 @@ def getNeighbors(location):
 # find the closest location - based on simple heuristic - with karbonite to our initial location.
 def nearbyKarb(location, planet):
     global totalNearbyKarbTime
-    
-    #check to make sure theres no karbonite right near us - no points in going through everything if there is
-    toCheck = getNeighbors(location)
-    toCheck.append(location)
-    for spot in toCheck:
-        tup = (spot.x, spot.y)
-        if tup in karboniteMapEarth:
-            return spot
-    
-    
     takenDest = []
     for key in Memory.worker_paths:
-        try:
-            takenDest.append(Memory.worker_paths[key][-1])
-        except:
-            placeHolder = True
+        takenDest.append(Memory.worker_paths[key][-1])
     startT = int(round(time.time() * 1000))
 
     locCluster = []
@@ -387,33 +374,26 @@ def moveMarsUnit(unit):
         Memory.marsTroop_paths[unit.id] = path
 
     # move in the correct direction to get to our destination if possible.
-    try:
-        nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
+    nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
 
-        myDirection = unit.location.map_location().direction_to(nextStep)
+    myDirection = unit.location.map_location().direction_to(nextStep)
 
-        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-            gc.move_robot(unit.id, myDirection)
-            # remove the first step of the path that we had.
-            Memory.marsTroop_paths[unit.id] = path[1:]
-            if (Memory.marsTroop_paths[unit.id] == []):
-                Memory.marsTroop_paths[unit.id] = Constants.DESTINATION_REACHED
-            return
+    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+        gc.move_robot(unit.id, myDirection)
+        # remove the first step of the path that we had.
+        Memory.marsTroop_paths[unit.id] = path[1:]
+        if (Memory.marsTroop_paths[unit.id] == []):
+            Memory.marsTroop_paths[unit.id] = Constants.DESTINATION_REACHED
+        return
+    else:
+        if not gc.is_move_ready(unit.id):
+            placeHolder = True
         else:
-            if not gc.is_move_ready(unit.id):
-                placeHolder = True
-            else:
-                for i in np.random.permutation(8):
-                    myDirection = directions[i]
-                    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                        gc.move_robot(unit.id, myDirection)
-                        return
-    except:
-        for i in np.random.permutation(8):
-            myDirection = directions[i]
-            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                gc.move_robot(unit.id, myDirection)
-                return
+            for i in np.random.permutation(8):
+                myDirection = directions[i]
+                if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                    gc.move_robot(unit.id, myDirection)
+                    return
 
 
 def moveCombatUnit(unit):
@@ -451,32 +431,25 @@ def moveCombatUnit(unit):
         Memory.combat_paths[unit.id] = path
 
     # move in the correct direction to get to our destination if possible.
-    try:
-        nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
+    nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
 
-        myDirection = unit.location.map_location().direction_to(nextStep)
-        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-            gc.move_robot(unit.id, myDirection)
-            # remove the first step of the path that we had.
-            Memory.combat_paths[unit.id] = path[1:]
-            if (Memory.combat_paths[unit.id] == []):
-                Memory.combat_paths[unit.id] = Constants.DESTINATION_REACHED
-            return
+    myDirection = unit.location.map_location().direction_to(nextStep)
+    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+        gc.move_robot(unit.id, myDirection)
+        # remove the first step of the path that we had.
+        Memory.combat_paths[unit.id] = path[1:]
+        if (Memory.combat_paths[unit.id] == []):
+            Memory.combat_paths[unit.id] = Constants.DESTINATION_REACHED
+        return
+    else:
+        if not gc.is_move_ready(unit.id):
+            placeholder = True
         else:
-            if not gc.is_move_ready(unit.id):
-                placeholder = True
-            else:
-                for i in np.random.permutation(8):
-                    myDirection = directions[i]
-                    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                        gc.move_robot(unit.id, myDirection)
-                        return
-    except:
-        for i in np.random.permutation(8):
-            myDirection = directions[i]
-            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                gc.move_robot(unit.id, myDirection)
-                return
+            for i in np.random.permutation(8):
+                myDirection = directions[i]
+                if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                    gc.move_robot(unit.id, myDirection)
+                    return
 
 
 def moveWorker(unit):
@@ -497,30 +470,23 @@ def moveWorker(unit):
         Memory.worker_paths[unit.id] = path
 
     # move in the correct direction to get to our destination if possible.
-    try:
-        nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
+    nextStep = bc.MapLocation(unit.location.map_location().planet, path[0][0], path[0][1])
 
-        myDirection = unit.location.map_location().direction_to(nextStep)
+    myDirection = unit.location.map_location().direction_to(nextStep)
 
-        if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-            gc.move_robot(unit.id, myDirection)
-            # remove the first step of the path that we had.
+    if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+        gc.move_robot(unit.id, myDirection)
+        # remove the first step of the path that we had.
 
-            Memory.worker_paths[unit.id] = path[1:]
-            if (Memory.worker_paths[unit.id] == []):
-                Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
-            return
+        Memory.worker_paths[unit.id] = path[1:]
+        if (Memory.worker_paths[unit.id] == []):
+            Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
+        return
+    else:
+        if not gc.is_move_ready(unit.id):
+            placeholder = True
         else:
-            if not gc.is_move_ready(unit.id):
-                placeholder = True
-            else:
-                return
-    except:
-        for i in np.random.permutation(8):
-            myDirection = directions[i]
-            if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
-                gc.move_robot(unit.id, myDirection)
-                return
+            return
 
 def MarsWorkerLogic(unit):
     if inDanger(unit):
@@ -558,9 +524,9 @@ def MarsHealerLogic(unit):
                 unitToHeal = place
 
     if unitToHeal != unit:
-        if gc.is_heal_ready(unit.id) and gc.can_heal(unit.id, unitToHeal.id):
+        if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, unitToHeal.id):
             healCount += 1
-            gc.heal(unit.id, unitToHeal.id)
+            gc.attack(unit.id, unitToHeal.id)
             return
 
 
@@ -842,7 +808,15 @@ def WorkerLogic(unit):
 
     # if we have reached our destination, change this units destination to a placeholder representing
     # that it has been reached.
-    
+    try:
+        if (unit.location.map_location().x, unit.location.map_location().y) == Memory.worker_paths[unit.id][-1]:
+            Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
+    except:
+        # do nothing - here so that we don't get an error if we haven't calculated a path yet
+        destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
+        path = BFS_firstStep(unit, destination)
+        Memory.worker_paths[unit.id] = path
+        # if we don't have enough workers,
     if MyVars.workerCount < Constants.DESIRED_WORKERS and gc.karbonite() >= Constants.REPLICATE_COST:
         direct = getNeighbors(unit.location.map_location())
         for i in range(len(direct)):
@@ -920,11 +894,8 @@ def WorkerLogic(unit):
 
                     # if this one is here harvesting, then make sure that other ones go somewhere else
                     for key in Memory.worker_paths:
-                        try:
-                            if (harvestedLoc.x, harvestedLoc.y) == Memory.worker_paths[key][-1]:
-                                Memory.worker_paths[key] = Constants.DESTINATION_REACHED
-                        except:
-                            placeHolder = True
+                        if (harvestedLoc.x, harvestedLoc.y) == Memory.worker_paths[key][-1]:
+                            Memory.worker_paths[key] = Constants.DESTINATION_REACHED
 
                     if unit.location.map_location().planet == bc.Planet.Earth:
 
@@ -940,17 +911,6 @@ def WorkerLogic(unit):
                     return
 
         if len(karboniteMapEarth) > 0:
-            
-            try:
-                if (unit.location.map_location().x, unit.location.map_location().y) == Memory.worker_paths[unit.id][-1]:
-                    Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
-            except:
-                # do nothing - here so that we don't get an error if we haven't calculated a path yet
-                destination = nearbyKarb(unit.location.map_location(), bc.Planet.Earth)
-                path = BFS_firstStep(unit, destination)
-                Memory.worker_paths[unit.id] = path
-                # if we don't have enough workers,
-            
             moveWorker(unit)
         else:
             for i in np.random.permutation(8):
@@ -965,30 +925,17 @@ def karbMultiplier(location):
     minDistFriendly = 1000000
 
     for spot in Constants.START_POINTS:
-        tempDist = math.sqrt(pow(location.x - spot[0], 2) + pow(location.y - spot[1], 2))
+        tempDist = math.sqrt(pow(location.x - spot[0], 2) + pow(location.x - spot[1], 2))
         if tempDist < minDistFriendly:
             minDistFriendly = tempDist
 
-    differentStartLocations = 1
-    if len(Constants.START_POINTS) > 0:
-        firstStart = Constants.START_POINTS[0]
-        if len(Constants.START_POINTS) > 0:
-            for i in range(1,len(Constants.START_POINTS)):
-                temp = Constants.START_POINTS[i]
-                if pow(temp[0] - firstStart[0], 2) + pow(temp[1] - firstStart[1], 2) > 90:
-                    differentStartLocations+=1
-    
-    #print("We have " + str(differentStartLocations) + " different start locations")
-    
-    if differentStartLocations >= 3:
-        if minDistFriendly > 10:
-            return 0
-    elif differentStartLocations == 2:
-        if minDistFriendly > 15:
-            return 0
-    elif differentStartLocations == 1:
-        if minDistFriendly > 25:
-            return 0
+    for spot in Constants.ENEMY_START_POINTS:
+        tempDist = math.sqrt(pow(location.x - spot[0], 2) + pow(location.x - spot[1], 2))
+        if tempDist < minDistEnemy:
+            minDistEnemy = tempDist
+
+    if minDistFriendly >= minDistEnemy * 2:
+        return 0
 
     reachable = False
     for cluster in Memory.reachable_clusters:
@@ -1027,15 +974,6 @@ def rocket_logic(unit):
     garrison = unit.structure_garrison()
     if unit.location.map_location().planet == bc.Planet.Earth:
         destination = getRocketDestination(unit)
-        if gc.round() > 740:
-            print("Trying to perform a panic launch")
-            if gc.can_launch_rocket(unit.id, destination):
-                gc.launch_rocket(unit.id, destination)
-                MyVars.rocketLocations.remove(unit.location.map_location)
-                MyVars.rocketCount -= 1
-                print("Performed a panic rocket launch - flood coming")
-            else:
-                print("Couldn't launch")
         if inDanger(unit):
             if len(garrison) > 0:
                 if gc.can_launch_rocket(unit.id, destination):
@@ -1044,7 +982,6 @@ def rocket_logic(unit):
                     MyVars.rocketCount -= 1
                     print("Performed a panic rocket launch")
                 else:
-                    print("Distengrated")
                     gc.disintegrate_unit(unit.id)
                     MyVars.rocketLocations.remove(unit.location.map_location)
                     MyVars.rocketCount -= 1
@@ -1057,7 +994,12 @@ def rocket_logic(unit):
             gc.launch_rocket(unit.id, destination)
             MyVars.rocketLocations.remove(unit.location.map_location())
             MyVars.rocketCount -= 1
-        
+        elif gc.round() > 740:
+            if gc.can_launch_rocket(unit.id, destination):
+                gc.launch_rocket(unit.id, destination)
+                MyVars.rocketLocations.remove(unit.location.map_location)
+                MyVars.rocketCount -= 1
+                print("Performed a panic rocket launch - flood coming")
     elif unit.location.map_location().planet == bc.Planet.Mars:
         if len(garrison) > 0:
             d = random.choice(directions)
@@ -1358,9 +1300,9 @@ def healer_logic(unit):
                 unitToHeal = place
 
     if unitToHeal != unit:
-        if gc.is_heal_ready(unit.id) and gc.can_heal(unit.id, unitToHeal.id):
+        if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, unitToHeal.id):
             healCount += 1
-            gc.heal(unit.id, unitToHeal.id)
+            gc.attack(unit.id, unitToHeal.id)
             return
 
 
@@ -1380,9 +1322,6 @@ def factory_logic(unit):
     #the production of units is determined by the weight of the unit. a random number is selected from 0 to the combined weight of the units.
     #the number determins which kind of unit will be produced. The higher the weight of the unit, the greater chance it will be produced.
     # healer weight is increased until it reaches its max weight so that more healers are produced later in the game than at the begining
-    #if we are critically low on workers we produce them
-    elif MyVars.workerCount < 3 and gc.can_produce_robot(unit.id, bc.UnitType.Worker):
-        gc.produce_robot(unit.id, bc.UnitType.Worker)
     elif gc.can_produce_robot(unit.id, bc.UnitType.Ranger):
         toproduce = random.randint(0, (MyVars.mageWeight + MyVars.rangerWeight + MyVars.healerWeight))
         if toproduce <= MyVars.rangerWeight:
@@ -1653,8 +1592,7 @@ while True:
     print("Nearby Karb took + " + str(totalNearbyKarbTime))
     print("BFS took + " + str(totalBFSTime))
     print("Unreachable BFS took + " + str(unreachableTime))
-    print("Healed " + str(healCount) + " units throughout the game.")
-    
+
     # send the actions we've performed, and wait for our next turn.
     gc.next_turn()
 
