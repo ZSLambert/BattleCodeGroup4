@@ -24,6 +24,7 @@ avoidanceTime = 0
 successCount = 0
 healCount = 0
 
+
 class Memory:
     worker_paths = {}
     reachable_clusters = []
@@ -112,6 +113,8 @@ random.seed(6137)
 
 my_team = gc.team()
 
+
+#used to invert a direction to the opposite of what it is
 def invertDirection(direction):
     if direction == bc.Direction.North:
         return bc.Direction.South
@@ -172,7 +175,9 @@ def lowestDist(locList, destination):
             index = i
     return choice, index
 
-
+#evaluates a spot to build a potential factory or rocket at - penalties are given to spots on 
+#karbonite, or spots that border unpassable terrain - this attempts to make it so structures
+#are not built that completely block off one side of the map
 def evalFactorySpot(location):
     score = 100
 
@@ -244,11 +249,11 @@ def BFS_firstStep(unit, destination):
             if not taken and adjLoc not in visited and adjLoc not in queue:
                 parent[adjLoc] = node  # <<<<< record the parent of the node - used to get the path
                 queue.append(adjLoc)
-    # current bugFix - hoping to remove in the future - handles cases where we are trying to reach an unreachable destination.
+    # handles cases where we are trying to reach an unreachable destination.
     unreachableTime += int(round(time.time() * 1000)) - startT
     return Constants.DESTINATION_REACHED
 
-
+#from a starting location, maps out all the spots that can be reached from it
 def getReachable(unit):
     start = unit.location.map_location()
 
@@ -267,7 +272,9 @@ def getReachable(unit):
                 queue.append(adjLoc)
     return visited
 
-
+#maps reachable spots into different clusters - useful for maps where two units start on two "islands"
+#this makes it so that people on one cluster dont try to pathfind their way to an unreachable cluster,
+#which is impossible
 def mapReachable():
     for unit in gc.my_units():
         # make a coordinate from the location
@@ -280,7 +287,7 @@ def mapReachable():
             newCluster = getReachable(unit)
             Memory.reachable_clusters.append(newCluster)
 
-
+#given a map location, generates all the neighbors of this location that are passable terrain
 def getNeighbors(location):
     neighbors = []
     # goes through all the different changes that could be applied to a position, and adds them to our list if they have passable terrain
@@ -302,7 +309,7 @@ def nearbyKarb(location, planet):
     global totalNearbyKarbTime
     startT = int(round(time.time() * 1000))
 
-    #check to make sure theres no karbonite right near us - no points in going through everything if there is
+    #check to make sure theres no karbonite right near us - no points in going through everything if there is.  makes it so that maps like Julia dont take forever to run nearbyKarb
     toCheck = getNeighbors(location)
     toCheck.append(location)
     for spot in toCheck:
@@ -311,7 +318,7 @@ def nearbyKarb(location, planet):
             totalNearbyKarbTime += int(round(time.time() * 1000)) - startT
             return spot
     
-    
+    #lists all the destinations that other workers are currently going to
     takenDest = []
     for key in Memory.worker_paths:
         try:
@@ -356,7 +363,7 @@ def locFromDirect(unit, direction):
     change = Constants.CHANGE_FROM_DIRECT[direction]
     return bc.MapLocation(location.planet, location.x + change[0], location.y + change[1])
 
-
+#the counterpart to moving units on earth - this is used for mars
 def moveMarsUnit(unit):
     curPlanet = unit.location.map_location().planet
 
@@ -416,7 +423,7 @@ def moveMarsUnit(unit):
                 gc.move_robot(unit.id, myDirection)
                 return
 
-
+#moves a combat unit towards its destination, which is done differently than moving workers.
 def moveCombatUnit(unit):
     curPlanet = unit.location.map_location().planet
 
@@ -445,7 +452,8 @@ def moveCombatUnit(unit):
         # this will only happen the first time a destination is generated for a spot
         path = BFS_firstStep(unit, destination)
 
-        # they only travel half way to the enemy start point
+        # they only travel half way to the enemy start point.  Makes it so they don't blindly
+        #run into the enemy base one by one
         n = math.floor(len(path) / 2)
         del path[-n:]
 
@@ -473,15 +481,20 @@ def moveCombatUnit(unit):
                         gc.move_robot(unit.id, myDirection)
                         return
     except:
+        #if there was an error trying to do this, move in a random direction
         for i in np.random.permutation(8):
             myDirection = directions[i]
             if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
                 gc.move_robot(unit.id, myDirection)
                 return
 
-
+#moves a worker to its predetermined path.  Only tries to generate more paths if we have a significant
+#amount of time left, since sometimes that can be very costly
 def moveWorker(unit):
     
+    #workers often get stuck trying to head to karbonite when factories are built in their way
+    #this piece of code makes it so that if theyve been stuck for 5+ turns, they move randomly
+    #and calculate a new destination
     if unit.id in Memory.worker_turns_stuck:
         if Memory.worker_turns_stuck[unit.id] > 5:
             Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
@@ -541,6 +554,7 @@ def moveWorker(unit):
                 gc.move_robot(unit.id, myDirection)
                 return
 
+#basic logic for workers on mars
 def MarsWorkerLogic(unit):
     if inDanger(unit):
         successful = tryToMoveToSafety(unit)
@@ -557,7 +571,7 @@ def MarsWorkerLogic(unit):
             gc.move_robot(unit.id, myDirection)
             return
 
-
+#basic logic for healers on mars
 def MarsHealerLogic(unit):
     if inDanger(unit):
         successful = tryToMoveToSafety(unit)
@@ -569,6 +583,8 @@ def MarsHealerLogic(unit):
     lowestHealth = 1000
     unitToHeal = unit
 
+    
+    #heal the unit on our team that is most injured
     for place in nearby:
 
         if place.team == my_team:
@@ -587,7 +603,7 @@ def MarsHealerLogic(unit):
         gc.move_robot(unit.id, myDirection)
         return
 
-
+#Combat logic on mars
 def MarsCombatLogic(unit):
     if unit.id not in Memory.combat_destinations:
         point = (unit.location.map_location().x, unit.location.map_location().y)
@@ -710,7 +726,7 @@ def MarsCombatLogic(unit):
                         gc.move_robot(unit.id, myDirection)
                         return
 
-
+#returns the attack range for a given unit
 def getAttackRange(unit):
     if unit.unit_type == bc.UnitType.Ranger:
         return Constants.RANGER_RANGE
@@ -729,6 +745,8 @@ def dangerousSpot(location):
     for key in Memory.current_vision_earth:
         enemyUnit = Memory.current_vision_earth[key]
         enemyLoc = enemyUnit.location.map_location()
+        #add two to the range because if a enemyUnit could easily move into position to attack
+        #this spot it should be treated as dangerous
         enemyRange = getAttackRange(enemyUnit) + 2
         distTo = pow(enemyLoc.x - ourLoc.x, 2) + pow(enemyLoc.y - ourLoc.y, 2)
         if enemyUnit.unit_type == bc.UnitType.Ranger:
@@ -745,6 +763,8 @@ def inDanger(unit):
     for key in Memory.current_vision_earth:
         enemyUnit = Memory.current_vision_earth[key]
         enemyLoc = enemyUnit.location.map_location()
+        #add two to the range because if a enemyUnit could easily move into position to attack
+        #this spot it should be treated as dangerous
         enemyRange = getAttackRange(enemyUnit) + 2
         distTo = pow(enemyLoc.x - ourLoc.x, 2) + pow(enemyLoc.y - ourLoc.y, 2)
         if enemyUnit.unit_type == bc.UnitType.Ranger:
@@ -755,11 +775,12 @@ def inDanger(unit):
                 return True
     return False
 
-
+#if a unit is in danger, try to move it to the safest spot it will survive in
 def tryToMoveToSafety(unit):
     toCheck = getNeighbors(unit.location.map_location())
     toCheck.append(unit.location.map_location())
 
+    #only check spots that we are able to move to
     for spot in list(toCheck):
         if not gc.is_occupiable(spot) and spot != unit.location.map_location():
             toCheck.remove(spot)
@@ -771,6 +792,8 @@ def tryToMoveToSafety(unit):
     for spot in toCheck:
         damageDict[(spot.x, spot.y)] = 0
 
+    #go through every enemy unit, looking for ones that could attack us.  if they can attack this spot
+    #add their damage to the damage dictionary for that spot
     for key in Memory.current_vision_earth:
         enemyUnit = Memory.current_vision_earth[key]
         enemyType = enemyUnit.unit_type
@@ -801,6 +824,7 @@ def tryToMoveToSafety(unit):
         # this means we die no matter where we move, so we might as well not try to.
         return False
     else:
+        #pick one of potentialy many best spots and move to it
         randNum = 0
         if len(bestSpots) > 1:
             randNum = random.randint(0, len(bestSpots) - 1)
@@ -830,6 +854,7 @@ def WorkerLogic(unit):
         if successful:
             return
 
+    #if we're being sent to mars do that for sure
     if MyVars.rocketCount > 0 and unit.id in Memory.marsTroops and unit.location.map_location().planet == bc.Planet.Earth:
         if unit.id not in Memory.rocket_destination:
             rocketFound = False
@@ -953,6 +978,7 @@ def WorkerLogic(unit):
                     return
 
         # if we're close enough to our destination, harvest any karbonite that is near us
+        #we want to be close so we dont hold up an entire line of workers
         distToDest = 0
         try:
             if Memory.worker_paths[unit.id] == Constants.DESTINATION_REACHED:
@@ -991,6 +1017,7 @@ def WorkerLogic(unit):
                         karboniteMapMars[harvestedLoc.x][harvestedLoc.y] = gc.karbonite_at(harvestedLoc)
                     return
 
+        #only bother moving to new karbonite if we have some karbonite left on the map
         if len(karboniteMapEarth) > 0:
             
             try:
@@ -1007,13 +1034,14 @@ def WorkerLogic(unit):
 
             moveWorker(unit)
         else:
+            #move randomly
             for i in np.random.permutation(8):
                 myDirection = directions[i]
                 if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
                     gc.move_robot(unit.id, myDirection)
                     return
 
-
+#used to try to map out what karbonite is feasibly harvestable by us and which isnt
 def karbMultiplier(location):
     minDistEnemy = 1000000
     minDistFriendly = 1000000
@@ -1023,6 +1051,8 @@ def karbMultiplier(location):
         if tempDist < minDistFriendly:
             minDistFriendly = tempDist
 
+    #if we're spread out around the map we want to look at smaller places around where each person
+    #starts
     differentStartLocations = 1
     if len(Constants.START_POINTS) > 0:
         firstStart = Constants.START_POINTS[0]
@@ -1042,6 +1072,7 @@ def karbMultiplier(location):
         if minDistFriendly > 25:
             return 0
 
+    #if the karbonite isnt reachable automatically ignore it
     reachable = False
     for cluster in Memory.reachable_clusters:
         if (location.x, location.y) in cluster:
@@ -1052,6 +1083,7 @@ def karbMultiplier(location):
     else:
         return 0
 
+#picks a rocket destination from the potential landing spots
 def getRocketDestination(unit):
     
     if len(possibleLandingSpots) == 1:
@@ -1067,12 +1099,13 @@ def rocket_logic(unit):
     garrison = unit.structure_garrison()
     if unit.location.map_location().planet == bc.Planet.Earth:
         destination = getRocketDestination(unit)
+        #get off earth asap if its close to the flood
         if gc.round() > 740:
             if gc.can_launch_rocket(unit.id, destination):
                 gc.launch_rocket(unit.id, destination)
                 MyVars.rocketLocations.remove(unit.location.map_location())
                 MyVars.rocketCount -= 1
- 
+         #if we're being attacked get out of there
         if inDanger(unit):
             if len(garrison) > 0:
                 if gc.can_launch_rocket(unit.id, destination):
@@ -1084,17 +1117,20 @@ def rocket_logic(unit):
                     gc.disintegrate_unit(unit.id)
                     MyVars.rocketLocations.remove(unit.location.map_location())
                     MyVars.rocketCount -= 1
+        #try to load units if we're not full
         elif len(garrison) < 8:
             nearby = gc.sense_nearby_units(location.map_location(), Constants.ROCKET_VISION)
             for place in nearby:
                 if place.team == my_team and gc.can_load(unit.id, place.id):
                     gc.load(unit.id, place.id)
+        #if we're full, launch
         elif gc.can_launch_rocket(unit.id, destination):
             gc.launch_rocket(unit.id, destination)
             MyVars.rocketLocations.remove(unit.location.map_location())
             MyVars.rocketCount -= 1
         
     elif unit.location.map_location().planet == bc.Planet.Mars:
+        #unload units
         if len(garrison) > 0:
             d = random.choice(directions)
             if gc.can_unload(unit.id, d):
@@ -1104,6 +1140,7 @@ def rocket_logic(unit):
 
 
 def ranger_logic(unit):
+    #move towards our rocket if we're being sent to mars
     if unit.id in Memory.marsTroops and unit.location.map_location().planet == bc.Planet.Earth and MyVars.rocketCount > 0:
         if unit.id not in Memory.rocket_destination:
             rocketFound = False
@@ -1131,6 +1168,9 @@ def ranger_logic(unit):
         MarsCombatLogic(unit)
         return
 
+    #pick a random enemy starting location to go to initially.  make sure that its in a cluster
+    #that we can reach.  if none of the starting locations are reachable, let the entire group know
+    #and just start moving randomly
     if unit.id not in Memory.combat_destinations and not Constants.ENEMIES_UNREACHABLE:
         Memory.combat_destinations[unit.id] = (100, 100)
 
@@ -1156,6 +1196,7 @@ def ranger_logic(unit):
     else:
         Memory.combat_destinations[unit.id] = (100, 100)
 
+    #get out of danger if we can
     if inDanger(unit):
         successful = tryToMoveToSafety(unit)
 
@@ -1169,6 +1210,7 @@ def ranger_logic(unit):
     tooCloseEnemies = []
     nonAggressiveUnits = []
 
+    #map out all of the enemy units around us into their listings
     for place in nearby:
         if place.team != my_team:
             tempLoc = place.location.map_location()
@@ -1188,14 +1230,16 @@ def ranger_logic(unit):
             else:
                 tooCloseEnemies.append(place)
 
+    #our first priority should always be to kill enemies
     if killableEnemy != unit:
         # if the unit can attack the enemy and is ready to attack then attack the enemy
         if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, killableEnemy.id):
             gc.attack(unit.id, killableEnemy.id)
-
+    #next, we always prioritize killing dangerous enemies and attack the closest one
     elif mostDangerousEnemy != unit:
         if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, mostDangerousEnemy.id):
             gc.attack(unit.id, mostDangerousEnemy.id)
+    #if there are none of both of these, we attack the closest factory, worker, healer or rocket
     elif len(nonAggressiveUnits) > 0:
         if len(nonAggressiveUnits) == 1:
             if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, nonAggressiveUnits[0].id):
@@ -1207,7 +1251,7 @@ def ranger_logic(unit):
             if gc.is_attack_ready(unit.id) and gc.can_attack(unit.id, chosenEnemy.id):
                 gc.attack(unit.id, chosenEnemy.id)
     elif len(tooCloseEnemies) > 0:
-        #move away from enemys that are too close for comfort
+        #move away from enemys that are too close for comfort for rangers
         for i in np.random.permutation(len(tooCloseEnemies)):
 
             chosenEnemy = tooCloseEnemies[i]
@@ -1216,6 +1260,7 @@ def ranger_logic(unit):
                 gc.move_robot(unit.id, myDirection)
                 return
     else:
+        #if we have vision on enemies, try to move towards them
         for enemy in Memory.current_vision_earth:
             enemyLoc = bc.MapLocation(myLoc.planet, enemy[0], enemy[1])
             distTo = max(enemyLoc.x - myLoc.x, enemyLoc.y - myLoc.y)
@@ -1229,7 +1274,7 @@ def ranger_logic(unit):
         #if none of the other stuff happens, then move on to the move combat unit function
         moveCombatUnit(unit)
 
-
+#same exact thing as ranger logic except for we dont worry about a min attack range
 def mage_logic(unit):
     if unit.id in Memory.marsTroops and unit.location.map_location().planet == bc.Planet.Earth and MyVars.rocketCount > 0:
         if unit.id not in Memory.rocket_destination:
@@ -1345,7 +1390,7 @@ def mage_logic(unit):
         #if none of the other stuff happens, then move on to the move combat unit function
         moveCombatUnit(unit)
 
-
+#move randomly around the map and heal low health workers if possible.
 def healer_logic(unit):
     global healCount
 
@@ -1417,6 +1462,10 @@ def factory_logic(unit):
     #the number determins which kind of unit will be produced. The higher the weight of the unit, the greater chance it will be produced.
     # healer weight is increased until it reaches its max weight so that more healers are produced later in the game than at the begining
     #if we are critically low on workers we produce them
+    
+    #if the round is greater than 600, we want to prioritize making rockets so we dont put out units
+    #unless we have a ton of karbonite
+    
     if gc.round() < 600 or gc.karbonite() > 300:
         if MyVars.workerCount < 3 and gc.can_produce_robot(unit.id, bc.UnitType.Worker):
             gc.produce_robot(unit.id, bc.UnitType.Worker)
@@ -1441,8 +1490,12 @@ gc.queue_research(bc.UnitType.Worker)
 gc.queue_research(bc.UnitType.Rocket)
 gc.queue_research(bc.UnitType.Mage)
 gc.queue_research(bc.UnitType.Ranger)
+gc.queue_research(bc.UnitType.Ranger)
 gc.queue_research(bc.UnitType.Mage)
 gc.queue_research(bc.UnitType.Mage)
+gc.queue_research(bc.UnitType.Worker)
+gc.queue_research(bc.UnitType.Worker)
+
 
 directions = list(bc.Direction)
 
@@ -1626,10 +1679,12 @@ while True:
         # walk through our units:
         # this code will primarily be used to determine
         for unit in gc.my_units():
+            #if we're close to the flood send everyone to mars
             if gc.round() > 660:
                 if unit.unit_type in Constants.DANGEROUS_ENEMIES or unit.unit_type == bc.UnitType.Healer:
                     if unit.id not in Memory.marsTroops:
                         Memory.marsTroops.append(unit.id)
+
             if unit.unit_type == bc.UnitType.Worker:
                 location = unit.location
                 if location.is_on_map():
