@@ -35,6 +35,7 @@ class Memory:
     marsTroop_paths = {}
     rocket_destination = {}
     marsTroops = []
+    worker_turns_stuck = {}
 
 
 class Constants:
@@ -481,6 +482,16 @@ def moveCombatUnit(unit):
 
 
 def moveWorker(unit):
+    
+    if unit.id in Memory.worker_turns_stuck:
+        if Memory.worker_turns_stuck[unit.id] > 5:
+            Memory.worker_paths[unit.id] = Constants.DESTINATION_REACHED
+            for i in np.random.permutation(8):
+                myDirection = directions[i]
+                if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
+                    gc.move_robot(unit.id, myDirection)
+                    return
+    
     try:
         # get the destination that this unit is supposed to be going to
         path = Memory.worker_paths[unit.id]
@@ -508,6 +519,7 @@ def moveWorker(unit):
 
         if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
             gc.move_robot(unit.id, myDirection)
+            Memory.worker_turns_stuck[unit.id] = 0
             # remove the first step of the path that we had.
 
             Memory.worker_paths[unit.id] = path[1:]
@@ -518,6 +530,10 @@ def moveWorker(unit):
             if not gc.is_move_ready(unit.id):
                 placeholder = True
             else:
+                try:
+                    Memory.worker_turns_stuck[unit.id] += 1
+                except:
+                    Memory.worker_turns_stuck[unit.id] = 1
                 return
     except:
         for i in np.random.permutation(8):
@@ -846,16 +862,52 @@ def WorkerLogic(unit):
     # if we have reached our destination, change this units destination to a placeholder representing
     # that it has been reached.
     
-    if MyVars.workerCount < Constants.DESIRED_WORKERS and gc.karbonite() >= Constants.REPLICATE_COST:
-        direct = getNeighbors(unit.location.map_location())
-        for i in range(len(direct)):
-            direction = unit.location.map_location().direction_to(direct[i])
-            if gc.can_replicate(unit.id, direction):
-                gc.replicate(unit.id, direction)
-                MyVars.workerCount += 1
     else:
+        
         # get locations which are passable nearby
         validLocs = getNeighbors(unit.location.map_location())
+        
+        #this is time to start building as many rockets as humanly possible
+        if gc.round() > 600:
+            nearby = gc.sense_nearby_units(unit.location.map_location(), 2)
+            for tempUnit in nearby:
+                if gc.can_build(unit.id, tempUnit.id):
+                    gc.build(unit.id, tempUnit.id)
+                    return
+                else:
+                    if tempUnit.unit_type == bc.UnitType.Rocket:
+                        #we want to stay near it and not try to build anything else till this is done
+                        return
+            if gc.karbonite() > Constants.ROCKET_COST:
+                for loc in validLocs:
+                    tempScore = evalFactorySpot(loc)
+                    #we'll loosen standards since we're trying to get out of here asap
+                    if tempScore > 0:
+                        directTo = unit.location.map_location().direction_to(loc)
+                        if gc.can_blueprint(unit.id, bc.UnitType.Factory, directTo):
+                            gc.blueprint(unit.id, bc.UnitType.Rocket, directTo)
+                            MyVars.rocketCount += 1
+                            MyVars.rocketLocations.append(loc)
+                            return
+            #we need workers to make rockets but dont want too many at this point
+            if MyVars.workerCount <= 3 and gc.karbonite() >= Constants.REPLICATE_COST:
+                direct = getNeighbors(unit.location.map_location())
+                for i in range(len(direct)):
+                    direction = unit.location.map_location().direction_to(direct[i])
+                    if gc.can_replicate(unit.id, direction):
+                        gc.replicate(unit.id, direction)
+                        MyVars.workerCount += 1
+            #at this point in the game they're just going to wait around until they can build
+            return
+        
+        
+        if MyVars.workerCount < Constants.DESIRED_WORKERS and gc.karbonite() >= Constants.REPLICATE_COST:
+            direct = getNeighbors(unit.location.map_location())
+            for i in range(len(direct)):
+                direction = unit.location.map_location().direction_to(direct[i])
+                if gc.can_replicate(unit.id, direction):
+                    gc.replicate(unit.id, direction)
+                    MyVars.workerCount += 1
 
         # get nearby units and build them if possible
         nearby = gc.sense_nearby_units(unit.location.map_location(), 2)
@@ -1013,7 +1065,6 @@ def getRocketDestination(unit):
     else:
         choice = random.randint(0,len(possibleLandingSpots) -1)
         chosenSpot = possibleLandingSpots[choice]
-        possibleLandingSpots.remove(chosenSpot)
         return bc.MapLocation(bc.Planet.Mars, chosenSpot[0], chosenSpot[1])
 
 
@@ -1375,19 +1426,20 @@ def factory_logic(unit):
     #the number determins which kind of unit will be produced. The higher the weight of the unit, the greater chance it will be produced.
     # healer weight is increased until it reaches its max weight so that more healers are produced later in the game than at the begining
     #if we are critically low on workers we produce them
-    elif MyVars.workerCount < 3 and gc.can_produce_robot(unit.id, bc.UnitType.Worker):
-        gc.produce_robot(unit.id, bc.UnitType.Worker)
-    elif gc.can_produce_robot(unit.id, bc.UnitType.Ranger):
-        toproduce = random.randint(0, (MyVars.mageWeight + MyVars.rangerWeight + MyVars.healerWeight))
-        if toproduce <= MyVars.rangerWeight:
-            gc.produce_robot(unit.id, bc.UnitType.Ranger)
-            return
-        elif toproduce <= (MyVars.mageWeight + MyVars.rangerWeight):
-            gc.produce_robot(unit.id, bc.UnitType.Mage)
-            return
-        elif toproduce <= (MyVars.mageWeight + MyVars.rangerWeight + MyVars.healerWeight):
-            gc.produce_robot(unit.id, bc.UnitType.Healer)
-            return
+    if gc.round() < 600 or gc.karbonite() > 300:
+        if MyVars.workerCount < 3 and gc.can_produce_robot(unit.id, bc.UnitType.Worker):
+            gc.produce_robot(unit.id, bc.UnitType.Worker)
+        elif gc.can_produce_robot(unit.id, bc.UnitType.Ranger):
+            toproduce = random.randint(0, (MyVars.mageWeight + MyVars.rangerWeight + MyVars.healerWeight))
+            if toproduce <= MyVars.rangerWeight:
+                gc.produce_robot(unit.id, bc.UnitType.Ranger)
+                return
+            elif toproduce <= (MyVars.mageWeight + MyVars.rangerWeight):
+                gc.produce_robot(unit.id, bc.UnitType.Mage)
+                return
+            elif toproduce <= (MyVars.mageWeight + MyVars.rangerWeight + MyVars.healerWeight):
+                gc.produce_robot(unit.id, bc.UnitType.Healer)
+                return
 
 ###INITIAL SETUP###
 
@@ -1585,6 +1637,10 @@ while True:
         # walk through our units:
         # this code will primarily be used to determine
         for unit in gc.my_units():
+            if gc.round() > 660:
+                if unit.unit_type in Constants.DANGEROUS_ENEMIES or unit.unit_type == bc.UnitType.Healer:
+                    if unit.id not in Memory.marsTroops:
+                        Memory.marsTroops.append(unit.id)
             if unit.unit_type == bc.UnitType.Worker:
                 location = unit.location
                 if location.is_on_map():
