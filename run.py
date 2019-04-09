@@ -246,7 +246,6 @@ def BFS_firstStep(unit, destination):
                 queue.append(adjLoc)
     # current bugFix - hoping to remove in the future - handles cases where we are trying to reach an unreachable destination.
     unreachableTime += int(round(time.time() * 1000)) - startT
-    print(str(startLoc) + " trying to get to " + str(destLoc) + " was unreachable.")
     return Constants.DESTINATION_REACHED
 
 
@@ -705,8 +704,6 @@ def MarsCombatLogic(unit):
             if not gc.is_move_ready(unit.id):
                 placeholder = True
             else:
-                # avoidObstacle(unit)
-                print("Bad direction to move to - combat")
                 for i in np.random.permutation(8):
                     myDirection = directions[i]
                     if gc.can_move(unit.id, myDirection) and gc.is_move_ready(unit.id):
@@ -1035,8 +1032,6 @@ def karbMultiplier(location):
                 if pow(temp[0] - firstStart[0], 2) + pow(temp[1] - firstStart[1], 2) > 90:
                     differentStartLocations+=1
     
-    #print("We have " + str(differentStartLocations) + " different start locations")
-    
     if differentStartLocations >= 3:
         if minDistFriendly > 10:
             return 0
@@ -1073,23 +1068,19 @@ def rocket_logic(unit):
     if unit.location.map_location().planet == bc.Planet.Earth:
         destination = getRocketDestination(unit)
         if gc.round() > 740:
-            print("Trying to perform a panic launch")
             if gc.can_launch_rocket(unit.id, destination):
                 gc.launch_rocket(unit.id, destination)
                 MyVars.rocketLocations.remove(unit.location.map_location())
                 MyVars.rocketCount -= 1
-                print("Performed a panic rocket launch - flood coming")
-            else:
-                print("Couldn't launch")
+ 
         if inDanger(unit):
             if len(garrison) > 0:
                 if gc.can_launch_rocket(unit.id, destination):
                     gc.launch_rocket(unit.id, destination)
                     MyVars.rocketLocations.remove(unit.location.map_location())
                     MyVars.rocketCount -= 1
-                    print("Performed a panic rocket launch")
+ 
                 else:
-                    print("Distengrated")
                     gc.disintegrate_unit(unit.id)
                     MyVars.rocketLocations.remove(unit.location.map_location())
                     MyVars.rocketCount -= 1
@@ -1461,7 +1452,7 @@ marsMap = gc.starting_map(bc.Planet.Mars)
 earthWidth = earthMap.width
 earthHeight = earthMap.height
 
-print("Earth is " + str(earthWidth) + "x" + str(earthHeight))
+
 
 marsWidth = marsMap.width
 marsHeight = marsMap.height
@@ -1559,7 +1550,6 @@ else:
     else:
         MyVars.rangerWeight = 30
 
-print(len(karboniteMapEarth))
 
 while True:
     # We only support Python 3, which means brackets around print()
@@ -1630,7 +1620,6 @@ while True:
             count = 0
             for key in karboniteMapEarth:
                 count += karboniteMapEarth[key]
-            print("There is " + str(count) + " karbonite remaining")
 
         if gc.round() > 25:
             Constants.HARVEST_AMOUNT = 4
@@ -1700,10 +1689,6 @@ while True:
         # use this to show where the error was
         traceback.print_exc()
 
-    print("Nearby Karb took + " + str(totalNearbyKarbTime))
-    print("BFS took + " + str(totalBFSTime))
-    print("Unreachable BFS took + " + str(unreachableTime))
-    print("Healed " + str(healCount) + " units throughout the game.")
     
     # send the actions we've performed, and wait for our next turn.
     gc.next_turn()
